@@ -1,0 +1,16 @@
+{
+  "_schema": "loom-project-context v0",
+  "_status": "PLACEHOLDER — populate when the deployed app is being built.",
+  "where_it_runs": "TBD (Render web service / Vercel / etc.)",
+  "stack": {
+    "frontend": "TBD (Next.js / Vite + React / etc.)",
+    "backend": "TBD (FastAPI / Express / etc.)",
+    "deploy_target": "TBD"
+  },
+  "depends_on": {
+    "make_skills_core_engine": "Lizo-RoadTown/Make_Skills (Agency-to-Structure Engine)",
+    "the_loom_platform": "Lizo-RoadTown/the-loom (memory MCP, project registry, observatory)"
+  },
+  "data_sources": "TBD — once research surfaces what the product needs",
+  "user_focus": "TBD — depends on who the product serves"
+}

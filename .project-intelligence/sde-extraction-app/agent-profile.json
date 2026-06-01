@@ -1,0 +1,18 @@
+{
+  "_schema": "loom-agent-profile v0",
+  "_status": "PLACEHOLDER — fill when the deployed app gets built.",
+  "agent_name": "SDE Extraction (Deployed App Agent)",
+  "model": "TBD (Haiku for in-product latency, Sonnet for synthesis — match the use case)",
+  "system_prompt_seed": "TBD — write when the product shape is known. Will include: domain context from the research findings, the user's role (researcher? practitioner? both?), the agent's job (extract? recommend? synthesize?), the memory discipline (recall_at_turn_start, write_after_useful_exchange), the boundary rule (NOT sde-extraction-dev memory).",
+  "tool_set": [
+    "TBD — likely: web_search, web_fetch, domain-specific data tool(s), memory_recall (loom-memory MCP, scoped to project_tags=['sde-extraction-app']), memory_write (same scope)"
+  ],
+  "memory_discipline": {
+    "recall_at_turn_start": true,
+    "write_after_useful_exchange": true,
+    "tag_scope": ["sde-extraction-app"],
+    "must_not_read": ["sde-extraction-dev"],
+    "must_not_write_to": ["sde-extraction-dev"]
+  },
+  "boundary_rule_with_dev_instance": "The deployed app agent (this instance) and the researcher/developer agent (sde-extraction-dev) share the same Make_Skills core engine but MUST NOT share memory, context, permissions, or logs. Same hard boundary as the Hub's two-instance pattern."
+}

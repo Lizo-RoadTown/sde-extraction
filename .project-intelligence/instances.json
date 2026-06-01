@@ -1,12 +1,13 @@
 {
   "_schema": "loom-instance-manifest v0",
-  "_description": "Project-local Agency-to-Structure Engine instances in this repo. SDE_Extraction starts research-heavy with ONE instance (sde-extraction-dev). When the website/UI/backend materializes later, expect a second instance (sde-extraction-app) to be added — mirroring the Summer 2026 Hub two-instance pattern.",
+  "_description": "Project-local Agency-to-Structure Engine instances in this repo. SDE_Extraction starts research-heavy (sde-extraction-dev is the live instance). A placeholder app instance (sde-extraction-app) is pre-laid so the structure is ready when the deployed app surface materializes; its configs are stubs marked PLACEHOLDER.",
   "core_engine_source": "Lizo-RoadTown/Make_Skills (core + adapters)",
   "platform": "Lizo-RoadTown/the-loom",
   "instances": [
     {
       "id": "sde-extraction-dev",
       "surface": "researcher + developer-facing",
+      "status": "active",
       "where_it_runs": "Inside Claude Code sessions when Liz opens this repo for research or development work",
       "adapter": "research-project (primary) + development (for code work)",
       "watches": [
@@ -18,17 +19,24 @@
         "dev tasks (when web/backend work begins)"
       ],
       "memory_tag": "sde-extraction-dev",
-      "boundary": "Currently the only instance. When -app lands, must NOT share product/user memory with this dev/research instance without explicit safe routing."
-    }
-  ],
-  "future_instances": [
+      "boundary": "MUST NOT share product/user memory with the -app instance without explicit safe routing (when -app activates)."
+    },
     {
       "id": "sde-extraction-app",
-      "status": "not yet attached — pending web/UI materialization",
-      "intended_when": "Once research surfaces a product shape AND the website/backend/frontend is being built, this instance gets created with its own adapter + memory tag scope."
+      "surface": "user-facing (deployed app)",
+      "status": "placeholder — not yet active; configs are stubs marked PLACEHOLDER",
+      "where_it_runs": "TBD — Render web service / Vercel / etc. when the website + backend get built",
+      "adapter": "TBD — product-shaped adapter, decided when the research surfaces a product shape",
+      "watches": [
+        "TBD — depends on the product the research drives toward"
+      ],
+      "memory_tag": "sde-extraction-app",
+      "boundary": "MUST NOT share dev/research memory with the -dev instance without explicit safe routing. Same hard boundary rule as the Hub's two-instance pattern."
     }
   ],
   "registration_status": {
-    "sde-extraction-dev": "pending — POST https://loom-project-registry.onrender.com/projects"
-  }
+    "sde-extraction-dev": "pending — POST https://loom-project-registry.onrender.com/projects",
+    "sde-extraction-app": "deferred — register when the deployed app is being built"
+  },
+  "activation_note": "The -app instance's configs are PLACEHOLDER stubs. They establish the file structure and the boundary rule. Populate with real values when the deployed app surface is being built — at that point the research will have surfaced a product shape, and the configs can be filled with informed choices instead of TBDs."
 }

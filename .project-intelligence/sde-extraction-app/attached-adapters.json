@@ -1,0 +1,15 @@
+{
+  "_schema": "loom-attached-adapters v0",
+  "_status": "PLACEHOLDER — not yet active. Update when the app surface materializes.",
+  "adapters": [
+    {
+      "name": "TBD — likely a product-shaped adapter (e.g., research-product-app or web-app)",
+      "type": "project-type-adapter",
+      "source_repo": "Lizo-RoadTown/Make_Skills",
+      "source_path": "adapters/<TBD>/",
+      "version": "0.0.0-pending",
+      "status": "not-yet-decided; adapter choice depends on what the research drives the product to become",
+      "purpose": "Customizes the core Agency-to-Structure Engine for the user-facing deployed surface. Will watch user interactions with whatever the product turns out to be."
+    }
+  ]
+}

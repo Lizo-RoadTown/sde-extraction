@@ -1,0 +1,11 @@
+{
+  "_schema": "loom-project-type v0",
+  "_status": "PLACEHOLDER — the deployed app/website doesn't exist yet. This instance activates when apps/ + services/ get built out.",
+  "project_type": "research-product-app",
+  "instance_surface": "user-facing (when deployed)",
+  "loom_project_id": "sde-extraction-app",
+  "loom_display_name": "SDE Extraction (Deployed Product)",
+  "loom_description": "User-facing deployed surface for SDE Extraction — website + backend + frontend. Activates when research drives a product shape and the build begins.",
+  "phase": "not-yet-active",
+  "activates_when": "Liz decides the research has surfaced a product worth building. At that point: populate apps/, services/, fill in this instance's configs with real values, register with the-loom Project Registry, set LOOM_PROJECT_ID=sde-extraction-app on the deployment platform (NOT in the repo's local .env)."
+}

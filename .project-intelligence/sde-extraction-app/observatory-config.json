@@ -1,0 +1,23 @@
+{
+  "_schema": "loom-observatory-config v0",
+  "_status": "PLACEHOLDER — populate when the deployed app starts emitting telemetry.",
+  "events_logged": [
+    "TBD — typical set will include: user_session_started, agent_turn_started, agent_turn_completed, tool_called (per tool), error, latency_p50, latency_p99"
+  ],
+  "metadata_dimensions": [
+    "project_id (always sde-extraction-app)",
+    "session_id",
+    "user_id (if multi-tenant; opaque)",
+    "outcome (success | error | timeout)",
+    "latency_ms",
+    "tokens_in / tokens_out",
+    "model_used"
+  ],
+  "no_pii_rule": "Telemetry MUST NOT include user message contents, agent response contents, or any user PII. Only structural metadata. Same rule as the Hub's app instance.",
+  "destination": {
+    "otlp_endpoint": "${OTEL_EXPORTER_OTLP_ENDPOINT} (from the deployment platform's env vars, NOT the local repo .env)",
+    "platform_observatory": "the-loom Project Observatory (Grafana Cloud)",
+    "dashboard_filter": "project_id=sde-extraction-app"
+  },
+  "pattern_detection_triggers": "TBD — define when the product's typical user-shaped requests are known."
+}
