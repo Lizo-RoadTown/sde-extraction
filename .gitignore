@@ -1,0 +1,50 @@
+# Environment & secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# Discipline plugin runtime artifacts
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+.vite/
+.turbo/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Research data — large/proprietary datasets stay out of git
+# (See research/data/README.md for the convention.)
+research/data/*
+!research/data/README.md
+!research/data/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+Thumbs.db

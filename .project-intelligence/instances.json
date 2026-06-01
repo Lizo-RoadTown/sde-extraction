@@ -1,0 +1,34 @@
+{
+  "_schema": "loom-instance-manifest v0",
+  "_description": "Project-local Agency-to-Structure Engine instances in this repo. SDE_Extraction starts research-heavy with ONE instance (sde-extraction-dev). When the website/UI/backend materializes later, expect a second instance (sde-extraction-app) to be added — mirroring the Summer 2026 Hub two-instance pattern.",
+  "core_engine_source": "Lizo-RoadTown/Make_Skills (core + adapters)",
+  "platform": "Lizo-RoadTown/the-loom",
+  "instances": [
+    {
+      "id": "sde-extraction-dev",
+      "surface": "researcher + developer-facing",
+      "where_it_runs": "Inside Claude Code sessions when Liz opens this repo for research or development work",
+      "adapter": "research-project (primary) + development (for code work)",
+      "watches": [
+        "literature review patterns",
+        "data analysis workflows",
+        "findings synthesis",
+        "repeated research questions",
+        "decision points (what to investigate next)",
+        "dev tasks (when web/backend work begins)"
+      ],
+      "memory_tag": "sde-extraction-dev",
+      "boundary": "Currently the only instance. When -app lands, must NOT share product/user memory with this dev/research instance without explicit safe routing."
+    }
+  ],
+  "future_instances": [
+    {
+      "id": "sde-extraction-app",
+      "status": "not yet attached — pending web/UI materialization",
+      "intended_when": "Once research surfaces a product shape AND the website/backend/frontend is being built, this instance gets created with its own adapter + memory tag scope."
+    }
+  ],
+  "registration_status": {
+    "sde-extraction-dev": "pending — POST https://loom-project-registry.onrender.com/projects"
+  }
+}

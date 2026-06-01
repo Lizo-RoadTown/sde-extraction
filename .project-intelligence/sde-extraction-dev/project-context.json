@@ -1,0 +1,37 @@
+{
+  "_schema": "loom-project-context v0",
+  "repo_local_path": "C:\\Users\\Liz\\SDE_Extraction",
+  "git_origin": "https://github.com/Lizo-RoadTown/sde-extraction.git (private)",
+  "stack_today": {
+    "primary_work": "research (literature, data, synthesis)",
+    "language": "TBD — Python likely for data analysis; JS/TS later if web work",
+    "notebooks": "Jupyter (TBD)",
+    "deploy": "none yet (no app to deploy)"
+  },
+  "stack_future": {
+    "frontend": "TBD (React/Next.js likely if web)",
+    "backend": "TBD",
+    "deploy_target": "TBD — Render or Vercel per Liz's defaults"
+  },
+  "key_dirs": {
+    "research": "research/ — primary work surface today",
+    "research_literature": "research/literature/ — papers, lit reviews, annotated bibs",
+    "research_data": "research/data/ — datasets (gitignored; see research/data/README.md)",
+    "research_notebooks": "research/notebooks/ — analysis notebooks",
+    "research_findings": "research/findings/ — synthesized findings + write-ups",
+    "apps": "apps/ — placeholder for future website/frontend",
+    "services": "services/ — placeholder for future backend services",
+    "docs_proposals": "docs/proposals/ — architectural / design decisions",
+    "docs_plans": "docs/plans/ — dated execution plans",
+    "docs_test_runs": "docs/test-runs/ — friction-surface logs",
+    "docs_architecture": "docs/architecture/ — living architecture (loom-wiring.md is here)",
+    "docs_decisions": "docs/decisions/ — ADRs"
+  },
+  "current_state_2026_05_31": {
+    "seed": "complete (repo + GitHub + structure + skills + .project-intelligence/)",
+    "research_started": "not yet — repo just seeded",
+    "registration_with_project_registry": "pending",
+    "adapters_in_make_skills": "pending (research-project and development both)"
+  },
+  "active_focus": "TBD — Liz will set when research begins. Topic of SDE Extraction not yet defined in repo (left intentionally for her to articulate)."
+}

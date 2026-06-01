@@ -1,0 +1,15 @@
+{
+  "_schema": "loom-project-type v0",
+  "project_type": "research-project",
+  "secondary_types": ["software-development"],
+  "instance_surface": "researcher-and-developer-facing",
+  "loom_project_id": "sde-extraction-dev",
+  "loom_display_name": "SDE Extraction (Research)",
+  "loom_description": "Research-heavy project on SDE extraction. Starts with deep lit/data work; may grow into a website + backend + frontend. Loom-aware from day one.",
+  "phase": "heavy-research",
+  "phases_planned": [
+    "heavy-research (current)",
+    "synthesis-and-decision",
+    "build-out (web/UI/backend, if/when scope warrants)"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "_schema": "loom-observatory-config v0",
+  "events_logged": [
+    "claude_code_session_started",
+    "user_prompt_submitted",
+    "pre_tool_use",
+    "post_tool_use",
+    "stop",
+    "session_ended",
+    "friction_corrected",
+    "research_finding_written",
+    "research_question_logged",
+    "literature_source_added",
+    "decision_proposal_drafted",
+    "adr_written"
+  ],
+  "metadata_dimensions": [
+    "project_id (always sde-extraction-dev)",
+    "session_id (from CC)",
+    "tool_name (per hook event)",
+    "outcome (success | error | timeout)",
+    "active_file (if in scope)",
+    "research_phase (literature | data | synthesis | decision | build)"
+  ],
+  "destination": {
+    "otlp_endpoint": "${OTEL_EXPORTER_OTLP_ENDPOINT} (from .env or User-scope env vars)",
+    "platform_observatory": "the-loom Project Observatory (Grafana Cloud)",
+    "dashboard_filter": "project_id=sde-extraction-dev"
+  },
+  "pattern_detection_triggers": {
+    "repeated_research_question": {
+      "shape": "user asks the same research question shape 3+ times across sessions",
+      "threshold": 3,
+      "action_at_threshold": "Emit a local skill candidate to promotion-candidates/ for a domain-specific research-query playbook"
+    },
+    "repeated_synthesis_pattern": {
+      "shape": "user requests synthesis of N findings into a write-up with the same shape 3+ times",
+      "threshold": 3,
+      "action_at_threshold": "Emit a workflow candidate to workflow-candidates/ for a 'synthesize-N-findings' template"
+    },
+    "repeated_lit_review_format": {
+      "shape": "user formats lit reviews the same way 3+ times",
+      "threshold": 3,
+      "action_at_threshold": "Emit a skill candidate for a domain-specific lit-review-template skill"
+    }
+  }
+}

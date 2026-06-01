@@ -1,0 +1,24 @@
+{
+  "_schema": "loom-attached-adapters v0",
+  "adapters": [
+    {
+      "name": "research-project",
+      "type": "project-type-adapter",
+      "source_repo": "Lizo-RoadTown/Make_Skills",
+      "source_path": "adapters/research-project/",
+      "version": "0.0.0-pending",
+      "status": "intended; not yet implemented in Make_Skills",
+      "purpose": "Customizes the core Agency-to-Structure Engine for research-heavy projects: defines what to watch (lit review patterns, recurring research questions, synthesis cycles, decision points), how to surface findings, and what kinds of skill candidates emerge in research work."
+    },
+    {
+      "name": "development",
+      "type": "project-type-adapter",
+      "source_repo": "Lizo-RoadTown/Make_Skills",
+      "source_path": "adapters/development/",
+      "version": "0.0.0-pending",
+      "status": "intended; not yet implemented in Make_Skills",
+      "purpose": "Active when work moves into the apps/ + services/ directories. Watches dev tasks, architecture corrections, naming patterns, etc. (Same adapter the Hub uses for its dev instance.)"
+    }
+  ],
+  "active_adapter_today": "research-project (primary). The development adapter activates when apps/ or services/ get populated."
+}
