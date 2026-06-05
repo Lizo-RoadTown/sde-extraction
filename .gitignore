@@ -48,6 +48,10 @@ research/data/*
 *.log
 npm-debug.log*
 
+# Test / browser artifacts
+.playwright-mcp/
+verify-surface.png
+
 # Editor / OS
 .DS_Store
 .vscode/
