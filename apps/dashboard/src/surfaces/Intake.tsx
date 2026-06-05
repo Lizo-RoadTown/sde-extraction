@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, SectionTitle, Badge, StatCard } from "../ui";
-import { jobs } from "../mock";
+import { loadJobs } from "../data";
+import type { Job } from "../types";
 
 // Engine-found figures the user confirms (locked decision: engine enumerates, user confirms).
 const foundFigures = [
@@ -16,6 +17,10 @@ const stageLabel: Record<string, string> = {
 
 export function Intake() {
   const [picked, setPicked] = useState<string[]>(["Figure 2"]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  useEffect(() => {
+    loadJobs().then(setJobs);
+  }, []);
   const toggle = (l: string) =>
     setPicked((p) => (p.includes(l) ? p.filter((x) => x !== l) : [...p, l]));
 

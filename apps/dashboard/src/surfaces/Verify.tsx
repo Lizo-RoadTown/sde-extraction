@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, SectionTitle, Badge, SlotView, cx } from "../ui";
-import { escalations } from "../mock";
+import { loadEscalations } from "../data";
 import type { FigureExtraction, NamedSlot } from "../types";
 
 function SlotRow({ row }: { row: NamedSlot }) {
@@ -15,7 +15,7 @@ function SlotRow({ row }: { row: NamedSlot }) {
         <button className={cx("rounded px-2 py-1 text-xs", row.slot.status === "present" ? "bg-emerald-500/25 text-emerald-200" : "bg-slate-700/50 text-slate-400")}>present</button>
         <button className={cx("rounded px-2 py-1 text-xs", row.slot.status === "absent" ? "bg-amber-500/25 text-amber-200" : "bg-slate-700/50 text-slate-400")}>absent</button>
         {row.slot.status === "absent" && (
-          <select defaultValue={row.slot.reason} className="rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-300">
+          <select aria-label="absence reason" defaultValue={row.slot.reason} className="rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-300">
             <option value="not_stated">not_stated</option>
             <option value="requires_inference">requires_inference</option>
           </select>
@@ -75,8 +75,17 @@ function Detail({ ext }: { ext: FigureExtraction }) {
 }
 
 export function Verify() {
-  const [selected, setSelected] = useState(escalations[0].id);
-  const ext = escalations.find((e) => e.id === selected)!;
+  const [escalations, setEscalations] = useState<FigureExtraction[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => {
+    loadEscalations().then((e) => {
+      setEscalations(e);
+      setSelected((cur) => cur ?? e[0]?.id ?? null);
+    });
+  }, []);
+  const ext = escalations.find((e) => e.id === selected);
+
+  if (!ext) return <div className="p-6 text-sm text-slate-400">No escalations in the queue.</div>;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4">

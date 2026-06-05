@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { Card, SectionTitle, Badge, StatCard } from "../ui";
-import { jobs } from "../mock";
+import { loadJobs } from "../data";
+import type { Job } from "../types";
 
 // Our pipeline stages, fed by OTel → loom + Supabase job rows.
 const stages = [
@@ -12,6 +14,10 @@ const stages = [
 ];
 
 export function Process() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  useEffect(() => {
+    loadJobs().then(setJobs);
+  }, []);
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <SectionTitle hint="Watch the engine work. Status fed by OTel → the-loom; click a job for its trace (the hash/extract/verify spans).">

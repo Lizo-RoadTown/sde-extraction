@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { Card, SectionTitle, Badge } from "../ui";
-import { library } from "../mock";
+import { loadLibrary } from "../data";
+import type { FigureExtraction } from "../types";
 
 const facets = [
   { name: "Pathogen", options: ["All", "Malaria", "Dengue", "Influenza", "Hepatitis B", "Cholera"] },
@@ -9,6 +11,10 @@ const facets = [
 ];
 
 export function Library() {
+  const [library, setLibrary] = useState<FigureExtraction[]>([]);
+  useEffect(() => {
+    loadLibrary().then(setLibrary);
+  }, []);
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <SectionTitle hint="Browse verified (paper, figure) models — the structured archive.">

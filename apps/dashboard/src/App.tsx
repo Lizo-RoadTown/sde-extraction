@@ -4,6 +4,7 @@ import { Process } from "./surfaces/Process";
 import { Verify } from "./surfaces/Verify";
 import { Library } from "./surfaces/Library";
 import { cx } from "./ui";
+import { AuthGate } from "./auth";
 
 type Surface = "intake" | "process" | "verify" | "library";
 
@@ -18,6 +19,7 @@ export default function App() {
   const [surface, setSurface] = useState<Surface>("verify");
 
   return (
+    <AuthGate>
     <div className="flex min-h-screen">
       {/* sidebar nav */}
       <aside className="flex w-56 flex-col border-r border-slate-800 bg-slate-900/60 p-3">
@@ -67,5 +69,6 @@ export default function App() {
         </main>
       </div>
     </div>
+    </AuthGate>
   );
 }
