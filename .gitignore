@@ -6,6 +6,12 @@
 # Discipline plugin runtime artifacts
 .claude/
 
+# Vendored REFERENCE material — read-only, not part of this repo's tracked content.
+# AT3_review/ is a local copy of the existing HITL review system (its own git repo,
+# nested .git). Kept for reference to prior work; do NOT commit it into SDE_Extraction
+# (it would land as a broken embedded-repo pointer). Includes its curation-dev/ folder.
+AT3_review/
+
 # Python
 __pycache__/
 *.py[cod]

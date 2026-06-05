@@ -27,6 +27,14 @@
     "docs_architecture": "docs/architecture/ — living architecture (loom-wiring.md is here)",
     "docs_decisions": "docs/decisions/ — ADRs"
   },
+  "reference_dirs": {
+    "AT3_review": "AT3_review/ — READ-ONLY reference. Vendored local copy of the prior GitHub-based HITL review system (manual curation -> first review -> second review) for SDE epidemiological models. Its own nested git repo; git-ignored here; do NOT edit or commit. Includes curation-dev/ (curator notebooks + curation-template.ipynb, the de facto extraction schema). Context for the new direction: automate the curation/extraction step with OpenAI + Pydantic."
+  },
+  "provenance_dirs": {
+    "Agent Drafts": "Agent Drafts/ — AI-generated/assisted output NOT yet human-validated. Agents and workflows write here, each artifact with a provenance header. First item: 2026-06-01-prior-art-and-pipeline.md.",
+    "Human validated": "Human validated/ — artifacts Liz has reviewed, corrected, and stands behind. INTEGRITY BOUNDARY: agents must NOT write here; only Liz promotes a draft (with a validation note). Documents the human-in-the-loop division of labor for Liz's own work (mirrors AT3_review original->review-copy->completed)."
+  },
+  "active_focus_2026_06_01": "DEFINED: automate extraction of stochastic-differential-equation (SDE) epidemiological models from academic literature into validated Pydantic schemas via OpenAI structured outputs, feeding a human-in-the-loop verification queue (the AT3_review pattern). Supersedes the earlier 'TBD' in active_focus.",
   "current_state_2026_05_31": {
     "seed": "complete (repo + GitHub + structure + skills + .project-intelligence/)",
     "research_started": "not yet — repo just seeded",

@@ -31,6 +31,44 @@ When the website/UI surface materializes later, expect a second instance (`sde-e
 | `.project-intelligence/sde-extraction-dev/observatory-config.json` | Events you log + pattern triggers |
 | `docs/architecture/loom-wiring.md` | How this repo plugs into the-loom + Make_Skills |
 | `research/` | The primary work surface — literature, data, notebooks, findings |
+| `AT3_review/` | **REFERENCE ONLY** — vendored copy of the prior HITL review system (see below) |
+| `Agent Drafts/` | AI-generated/assisted output, **not yet human-validated**. Agents write here. |
+| `Human validated/` | Reviewed + approved by Liz. **Agents must NOT write here** — only Liz promotes. |
+
+## Provenance convention — `Agent Drafts/` vs `Human validated/`
+
+These two folders document the human-in-the-loop division of labor for Liz's own work (the same
+pattern as AT3_review's `original/` → `review-copy/` → `completed/`). The point: a chat transcript
+shows Liz's questioning but not her judgment applied to outputs. This split makes that judgment
+legible and auditable.
+
+- **`Agent Drafts/`** — everything an LLM/agent/workflow produced that a human has not yet checked.
+  Agents and workflows write here. Each artifact gets a provenance header (what generated it, when,
+  from what human input, validation pending).
+- **`Human validated/`** — artifacts Liz has read, verified, corrected, and stands behind.
+  **This is an integrity boundary: agents never write into `Human validated/`.** Only Liz promotes
+  a draft here (with a short note on what she validated/changed). An item here means a human
+  endorsed it; an item in `Agent Drafts/` means not yet. The diff between the two is the evidence
+  of Liz's contribution.
+
+## Reference material — `AT3_review/`
+
+`AT3_review/` is a **read-only reference folder**, not an active work surface. It is a local
+copy of the existing GitHub-based human-in-the-loop (HITL) review queue for SDE
+epidemiological models — the manual curation → first-review → second-review pipeline that
+predates this project. It includes its own `curation-dev/` folder (the curator's working
+notebooks + the curation template).
+
+Rules for this folder:
+
+- **Do not edit it, refactor it, or treat it as part of SDE_Extraction's runtime or dev surface.** It is its own git repository (nested `.git/`) with its own history.
+- **It is git-ignored** in this repo (see `.gitignore`) so it never gets committed as an embedded-repo pointer.
+- **Read it for context**, not as a target. It shows what was being done manually; the new
+  direction is to automate the *curation/extraction* step (paper → structured SDE model)
+  using OpenAI + Pydantic, then feed results into a HITL queue like this one for verification.
+- Highest-value files: `AT3_review/curation-dev/template/curation-template.ipynb` (the de
+  facto extraction schema), `AT3_review/docs/AI_AND_AUTOMATION.md`, `AT3_review/docs/ROADMAP.md`,
+  and `AT3_review/ignore guidance docs/` (the SDE-pipeline architecture sketches).
 
 ## Methodology skills (in this repo)
 
@@ -77,7 +115,7 @@ Bundled locally — don't fetch from remote. Read the relevant SKILL.md before w
 ## Discipline rules (auto-injected by the plugin, restated for clarity)
 
 - **PROBE before asserting** — Grep/Read files before claiming facts; cite file:line
-- **Distinguish dev-tooling from runtime** — for this repo: `research/` + `scripts/` + `docs/` = dev-tooling; `apps/` + `services/` (when populated) = runtime
+- **Distinguish dev-tooling from runtime** — for this repo: `research/` + `scripts/` + `docs/` = dev-tooling; `apps/` + `services/` (when populated) = runtime; `AT3_review/` = read-only **reference** (neither — don't edit, don't commit)
 - **Save friction as memory immediately** — write a feedback memory tagged `["sde-extraction-dev"]` when Liz corrects you
 - **Cite skills by name** when invoking
 - **Layered explanation pattern** — ELI5 → quick reference → depth (cite file:line) → mental model
