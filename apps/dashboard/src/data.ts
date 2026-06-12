@@ -114,11 +114,74 @@ export async function enqueueJob(paperId: string, figureLabel: string, target: J
   return !error;
 }
 
+// A unified work item for the Papers surface: one (paper, figure) with a real,
+// actionable status. Combines in-progress jobs (no extraction row yet) with
+// extractions awaiting review — the things the human actually acts on.
+export type WorkStatus = "extracting" | "needs_review" | "failed";
+export interface WorkItem {
+  key: string;
+  paperTitle: string;
+  figureLabel: string;
+  status: WorkStatus;
+  extractionId: string | null; // present once extracted → opens the verifier
+  updatedAt: string;
+}
+
+export async function loadWorkItems(): Promise<WorkItem[]> {
+  if (!supabase) return [];
+  const items: WorkItem[] = [];
+
+  // Extractions awaiting human review (the actionable set).
+  const { data: exts, error: e1 } = await supabase
+    .from("extractions")
+    .select("id, figure_label, status, updated_at, papers(title)")
+    .eq("status", "needs_human");
+  if (e1) console.error("loadWorkItems(extractions):", e1.message);
+  for (const r of (exts ?? []) as Record<string, unknown>[]) {
+    items.push({
+      key: `ext-${r.id}`,
+      paperTitle: ((r.papers as { title?: string } | null)?.title) ?? "—",
+      figureLabel: String(r.figure_label),
+      status: "needs_review",
+      extractionId: String(r.id),
+      updatedAt: String(r.updated_at),
+    });
+  }
+
+  // Jobs still in flight or failed (no extraction row to open yet).
+  const { data: jobs, error: e2 } = await supabase
+    .from("extraction_jobs")
+    .select("id, figure_label, stage, updated_at, papers(title)")
+    .not("stage", "in", "(stored)")
+    .order("updated_at", { ascending: false });
+  if (e2) console.error("loadWorkItems(jobs):", e2.message);
+  for (const r of (jobs ?? []) as Record<string, unknown>[]) {
+    const stage = String(r.stage);
+    items.push({
+      key: `job-${r.id}`,
+      paperTitle: ((r.papers as { title?: string } | null)?.title) ?? "—",
+      figureLabel: String(r.figure_label),
+      status: stage === "failed" ? "failed" : "extracting",
+      extractionId: null,
+      updatedAt: String(r.updated_at),
+    });
+  }
+
+  return items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
 export async function loadEscalations(): Promise<FigureExtraction[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from("extractions").select("*").eq("status", "needs_human");
   if (error) { console.error("loadEscalations:", error.message); return []; }
   return (data ?? []).map(rowToExtraction);
+}
+
+export async function loadExtraction(id: string): Promise<FigureExtraction | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("extractions").select("*").eq("id", id).single();
+  if (error || !data) { if (error) console.error("loadExtraction:", error.message); return null; }
+  return rowToExtraction(data);
 }
 
 export async function loadLibrary(): Promise<FigureExtraction[]> {

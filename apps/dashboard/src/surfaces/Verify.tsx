@@ -109,7 +109,7 @@ function SlotRow({
   );
 }
 
-function Detail({ ext }: { ext: FigureExtraction }) {
+export function Detail({ ext }: { ext: FigureExtraction }) {
   const rows: NamedSlot[] = useMemo(
     () => [
       ...ext.stateVariables,

@@ -1,24 +1,22 @@
 import { useState } from "react";
-import { Intake } from "./surfaces/Intake";
-import { Verify } from "./surfaces/Verify";
+import { Papers } from "./surfaces/Papers";
 import { Library } from "./surfaces/Library";
 import { ExtractionHealth } from "./surfaces/ExtractionHealth";
 import { cx } from "./ui";
 import { AuthGate } from "./auth";
 
-// Organized by what a human does, not by pipeline stage (Process dissolved —
-// see docs/superpowers/specs/2026-06-12-dashboard-nav-redesign-design.md).
-type Surface = "intake" | "verify" | "library" | "health";
+// Organized by the real work motion: add a paper + verify it (one surface),
+// browse the verified archive, and the engine's telemetry/confidence.
+type Surface = "papers" | "library" | "health";
 
 const NAV: { key: Surface; label: string; blurb: string }[] = [
-  { key: "intake", label: "Intake", blurb: "add papers · watch them process" },
-  { key: "verify", label: "Verify", blurb: "present / absent + figure" },
+  { key: "papers", label: "Papers", blurb: "add · verify" },
   { key: "library", label: "Library", blurb: "verified models" },
-  { key: "health", label: "Extraction Health", blurb: "confidence · self-update" },
+  { key: "health", label: "Extraction Health", blurb: "telemetry · confidence" },
 ];
 
 export default function App() {
-  const [surface, setSurface] = useState<Surface>("intake");
+  const [surface, setSurface] = useState<Surface>("papers");
 
   return (
     <AuthGate>
@@ -65,8 +63,7 @@ export default function App() {
           </div>
         </header>
         <main className="flex-1 overflow-auto p-6">
-          {surface === "intake" && <Intake />}
-          {surface === "verify" && <Verify />}
+          {surface === "papers" && <Papers />}
           {surface === "library" && <Library />}
           {surface === "health" && <ExtractionHealth />}
         </main>
