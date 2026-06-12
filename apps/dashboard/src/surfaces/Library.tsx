@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
-import { Card, SectionTitle, Badge } from "../ui";
+import { Card, SectionTitle, Badge, ConfidenceChip } from "../ui";
 import { loadLibrary } from "../data";
 import type { FigureExtraction } from "../types";
+
+// Mock extractor-confidence, deterministic from id (replaced by the engine's score later).
+function mockConfidence(id: string): number {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 1000;
+  return 0.35 + (h / 1000) * 0.6;
+}
 
 const facets = [
   { name: "Pathogen", options: ["All", "Malaria", "Dengue", "Influenza", "Hepatitis B", "Cholera"] },
@@ -45,7 +52,10 @@ export function Library() {
             <div className="text-xs text-ink-faint">{m.figureLabel} · {m.pathogen}</div>
             <div className="mt-1 flex items-center justify-between">
               <span className="mono text-[11px] text-ink-faint">{m.doi}</span>
-              <Badge tone={m.figureReproduced ? "green" : "slate"}>{m.figureReproduced ? "verified ✓" : "pending"}</Badge>
+              <div className="flex items-center gap-1.5">
+                <ConfidenceChip score={mockConfidence(m.id)} />
+                <Badge tone={m.figureReproduced ? "green" : "slate"}>{m.figureReproduced ? "verified ✓" : "pending"}</Badge>
+              </div>
             </div>
           </Card>
         ))}

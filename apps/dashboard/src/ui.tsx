@@ -59,6 +59,23 @@ export function StatCard({ label, value, tone = "slate" }: { label: string; valu
   );
 }
 
+// Confidence chip — the embedded signal from Extraction Health that travels into
+// Verify + Library. Banded sage/amber/rose (exception-marking). Structure-level:
+// the score is not engine-produced yet, so callers pass mock values for now.
+export function ConfidenceChip({ score }: { score?: number }) {
+  if (score == null) return null;
+  const dot = score >= 0.75 ? "bg-present" : score >= 0.5 ? "bg-attention" : "bg-invalid";
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-edge px-1.5 py-0.5 text-[10px] text-ink-dim"
+      title={`extractor confidence on this document type: ${score.toFixed(2)} (sample — not engine-produced yet)`}
+    >
+      <span className={cx("h-1.5 w-1.5 rounded-full", dot)} />
+      <span className="mono">{score.toFixed(2)}</span>
+    </span>
+  );
+}
+
 // The heart of our model in the UI: a slot is present (value + lineage) or absent (a reason).
 // Per docs/UX_CONTRACT.md, present / absent must be visually unambiguous — never blank:
 //  - present  -> a filled card that "fill-pop"s in (the value, its meaning, source, lineage)

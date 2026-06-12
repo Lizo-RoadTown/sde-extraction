@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { SectionTitle, Badge, SlotView, cx } from "../ui";
+import { SectionTitle, Badge, SlotView, ConfidenceChip, cx } from "../ui";
 import { Card } from "../ui";
+
+// Mock extractor-confidence for an item, deterministic from its id (stable across
+// renders). Structure-level: replaced by the engine's real per-dimension score later.
+function mockConfidence(id: string): number {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 1000;
+  return 0.35 + (h / 1000) * 0.6; // 0.35–0.95
+}
 import { loadEscalations } from "../data";
 import { PdfPane } from "./PdfPane";
 import { FigurePane } from "./FigurePane";
@@ -203,18 +211,23 @@ export function Verify() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
-      <SectionTitle hint="An escalation inbox — the verifying agent already cleared what's machine-provable and surfaces only what needs your eyes, with lineage, proof, and the PDF.">
+      <SectionTitle hint="An escalation inbox — the verifying agent already cleared what's machine-provable and surfaces only what needs your eyes, with lineage, proof, and the PDF. Ordered lowest-confidence first, so the riskiest extractions get your eyes first.">
         Verify
       </SectionTitle>
       <div className="flex gap-4">
-        {/* escalation inbox */}
+        {/* escalation inbox — sorted lowest extractor-confidence first (riskiest first) */}
         <div className="flex w-64 shrink-0 flex-col gap-2">
-          {escalations.map((e) => (
+          {[...escalations]
+            .sort((a, b) => mockConfidence(a.id) - mockConfidence(b.id))
+            .map((e) => (
             <button type="button" key={e.id} onClick={() => setSelected(e.id)}
               className={cx("rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active", e.id === selected ? "border-active-edge bg-active-soft" : "border-edge bg-surface-raised/40 hover:bg-surface-raised/70")}>
               <div className="text-sm text-ink">{e.figureLabel}</div>
               <div className="truncate text-xs text-ink-faint">{e.paperTitle}</div>
-              <div className="mt-1"><Badge tone="amber">needs human</Badge></div>
+              <div className="mt-1 flex items-center gap-1.5">
+                <Badge tone="amber">needs human</Badge>
+                <ConfidenceChip score={mockConfidence(e.id)} />
+              </div>
             </button>
           ))}
         </div>
