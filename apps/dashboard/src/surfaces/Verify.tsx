@@ -141,8 +141,9 @@ function Detail({ ext }: { ext: FigureExtraction }) {
         <a href={ext.pdfUrl} className="rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
       </div>
 
-      {/* two panes: source PDF (jumps to the focused slot's page) + figure-compare oracle */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* source PDF on top (full width), figure-compare oracle stacked beneath it —
+          both need room; side-by-side made the figure images tiny. */}
+      <div className="flex flex-col gap-4">
         <PdfPane pdfUrl={ext.pdfUrl} targetPage={focus?.page} quote={focus?.quote} />
         <FigurePane ext={ext} />
       </div>

@@ -11,12 +11,12 @@ export function FigurePane({ ext }: { ext: FigureExtraction }) {
   const label = repro === true ? "reproduced" : repro === false ? "not reproduced" : "not run yet";
 
   return (
-    <Card className="flex h-80 flex-col gap-2 p-3">
+    <Card className="flex flex-col gap-2 p-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-ink">Figure compare</span>
         <Badge tone={tone}>{label}</Badge>
       </div>
-      <div className="grid flex-1 grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3">
         <FigureSlot caption={`paper · ${ext.figureLabel}`} />
         <FigureSlot caption="regenerated" />
       </div>
@@ -30,9 +30,9 @@ export function FigurePane({ ext }: { ext: FigureExtraction }) {
 
 function FigureSlot({ caption }: { caption: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1 rounded-md border border-dashed border-edge bg-surface-raised/40 text-center">
+    <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-md border border-dashed border-edge bg-surface-raised/40 text-center">
       <span className="rounded bg-surface-raised px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-dim">no image yet</span>
-      <span className="text-[11px] text-ink-faint">{caption}</span>
+      <span className="text-xs text-ink-faint">{caption}</span>
     </div>
   );
 }

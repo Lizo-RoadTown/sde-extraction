@@ -26,12 +26,26 @@ type UploadState =
   | { kind: "done"; paper: UploadedPaper }
   | { kind: "error"; message: string };
 
+// How the user wants the engine to target what to extract from the PDF.
+type TargetMode = "auto" | "figure" | "model" | "whole";
+const TARGET_MODES: { key: TargetMode; label: string; blurb: string }[] = [
+  { key: "auto", label: "Auto-detect", blurb: "engine finds the figures · you confirm" },
+  { key: "figure", label: "By figure", blurb: "you name the figure to target" },
+  { key: "model", label: "By model", blurb: "you describe the model to find" },
+  { key: "whole", label: "Whole paper", blurb: "extract everything the engine finds" },
+];
+
 export function Intake() {
   const [picked, setPicked] = useState<string[]>(["Figure 2"]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [upload, setUpload] = useState<UploadState>({ kind: "idle" });
   const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // Targeting: which mode, plus the free-text the figure/model modes need.
+  const [mode, setMode] = useState<TargetMode>("auto");
+  const [figureRef, setFigureRef] = useState("");
+  const [modelDesc, setModelDesc] = useState("");
 
   useEffect(() => {
     loadJobs().then(setJobs);
@@ -115,23 +129,68 @@ export function Intake() {
         </div>
 
         <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-ink">Figures found</span>
-            <Badge tone="cyan">engine found 3 · you confirm</Badge>
-          </div>
-          <div className="flex flex-col gap-2">
-            {foundFigures.map((f) => (
-              <label key={f.label} className="flex cursor-pointer items-center gap-3 rounded-md border border-edge px-3 py-2 hover:bg-surface-raised/60">
-                <input type="checkbox" checked={picked.includes(f.label)} onChange={() => toggle(f.label)} className="accent-[color:var(--color-active)]" />
-                <div className="flex-1">
-                  <div className="text-sm text-ink">{f.label}</div>
-                  <div className="text-xs text-ink-faint">{f.caption} · p.{f.page}</div>
-                </div>
-              </label>
+          <div className="mb-3 text-sm font-medium text-ink">What should the engine extract?</div>
+
+          {/* segmented mode toggle */}
+          <div className="mb-1 flex gap-1 rounded-lg bg-inset p-1">
+            {TARGET_MODES.map((m) => (
+              <button
+                type="button"
+                key={m.key}
+                onClick={() => setMode(m.key)}
+                className={cx(
+                  "flex-1 rounded-md px-2 py-1.5 text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active",
+                  mode === m.key ? "bg-active-soft text-active" : "text-ink-dim hover:text-ink",
+                )}
+              >
+                {m.label}
+              </button>
             ))}
           </div>
-          <button className="mt-3 w-full rounded-md bg-active-soft py-2 text-sm text-active hover:brightness-110">
-            Extract {picked.length} figure{picked.length === 1 ? "" : "s"} →
+          <div className="mb-3 text-[11px] text-ink-faint">{TARGET_MODES.find((m) => m.key === mode)!.blurb}</div>
+
+          {/* conditional input per mode */}
+          {mode === "auto" && (
+            <div className="flex flex-col gap-2">
+              {foundFigures.map((f) => (
+                <label key={f.label} className="flex cursor-pointer items-center gap-3 rounded-md border border-edge px-3 py-2 hover:bg-surface-raised/60">
+                  <input type="checkbox" checked={picked.includes(f.label)} onChange={() => toggle(f.label)} className="accent-[color:var(--color-active)]" />
+                  <div className="flex-1">
+                    <div className="text-sm text-ink">{f.label}</div>
+                    <div className="text-xs text-ink-faint">{f.caption} · p.{f.page}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+          {mode === "figure" && (
+            <input
+              value={figureRef}
+              onChange={(e) => setFigureRef(e.target.value)}
+              placeholder="e.g. Figure 2, or p.12"
+              className="w-full rounded-md border border-edge bg-surface-raised/40 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
+            />
+          )}
+          {mode === "model" && (
+            <textarea
+              value={modelDesc}
+              onChange={(e) => setModelDesc(e.target.value)}
+              placeholder="describe the model to find — e.g. 'the stochastic SIR with Ornstein–Uhlenbeck noise'"
+              rows={2}
+              className="w-full rounded-md border border-edge bg-surface-raised/40 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
+            />
+          )}
+          {mode === "whole" && (
+            <div className="rounded-md border border-dashed border-edge px-3 py-4 text-center text-xs text-ink-faint">
+              The engine will extract every model it finds in the paper.
+            </div>
+          )}
+
+          <button type="button" className="mt-3 w-full rounded-md bg-active-soft py-2 text-sm text-active hover:brightness-110">
+            {mode === "auto" ? `Extract ${picked.length} figure${picked.length === 1 ? "" : "s"} →`
+              : mode === "figure" ? "Extract this figure →"
+              : mode === "model" ? "Find this model →"
+              : "Extract whole paper →"}
           </button>
         </Card>
       </div>
