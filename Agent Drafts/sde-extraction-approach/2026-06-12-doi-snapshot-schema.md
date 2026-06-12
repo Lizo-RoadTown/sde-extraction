@@ -72,10 +72,23 @@ create table doi_queue (
 create index on doi_queue (status, next_attempt_at) where status in ('queued','failed');
 ```
 
-### 2. `snapshots` — the retained provenance artifact (audit-grade)
+### 2. `snapshots` — the retained provenance artifact (audit-grade, two layers)
 
-Adapts proves `raw_snapshots`, hardened with WARC/PROV/fixity columns. **Format-agnostic**: TDM
-returns vary (Elsevier XML, Wiley PDF, Springer JATS XML) — store raw bytes + the exact Content-Type.
+Adapts proves `raw_snapshots`, hardened with WARC/PROV/fixity columns.
+
+**A snapshot has two layers, captured in order: raw then derived.**
+
+1. **Raw layer** — the *untouched bytes as served* (JATS XML, or a PDF blob — whatever the publisher
+   sent), stored and hashed **before anything interprets them**. This is the pristine provenance
+   moment: "exactly what the publisher gave us, unaltered, at this time, under this licence." Normalization
+   is an interpretation (a PDF text-extractor makes choices, can have bugs), so it must happen *after*
+   the snapshot, never before — the snapshot is interpretation-free.
+2. **Derived text layer** — the normalized text the extractor reads, produced as an explicit,
+   **re-derivable** step from the raw layer. Byte-offset lineage points into *this* text (offsets into
+   a PDF blob would be meaningless). If a better extractor comes along, re-derive the text without
+   touching the snapshot.
+
+Lifecycle gains a `normalized` step between `snapshotted` (raw stored) and `extracting`.
 
 ```sql
 create table snapshots (
@@ -84,16 +97,24 @@ create table snapshots (
   doi              text not null,
   -- WHERE + provider
   source_url       text not null,                   -- the TDM link actually fetched
-  provider         text not null,                   -- 'springer' | 'plos' | 'elsevier-oa' | ...
-  -- WHEN (WARC-Date, UTC)
+  provider         text not null,                   -- 'plos' | 'pmc' | 'springer-oa' | ...
+  -- WHEN (WARC-Date, UTC) — the snapshot moment, before any interpretation
   retrieved_at     timestamptz not null default now(),
-  -- WHAT (raw bytes + fixity). Large/binary (PDF) -> object storage, keep digest here.
-  content          bytea,
-  storage_key      text,                            -- if bytes live in Supabase Storage
-  content_type     text not null,                   -- AS RETURNED
+
+  -- RAW LAYER — untouched bytes as served (the pristine provenance record)
+  content_raw      bytea,                           -- the served bytes (XML or PDF blob)
+  raw_storage_key  text,                            -- if large/binary, bytes live in object storage
+  served_format    text not null,                   -- 'jats-xml' | 'xml' | 'pdf' | 'text'
+  served_sha256    char(64) not null,               -- fixity digest of the RAW bytes (the snapshot fingerprint)
   content_length   bigint,
-  content_sha256   char(64) not null,               -- fixity digest (the snapshot fingerprint)
   hash_algorithm   text not null default 'sha256',
+
+  -- DERIVED TEXT LAYER — normalized after storage; offsets point here; re-derivable
+  content_text     text,                            -- normalized text (null until 'normalized')
+  text_sha256      char(64),                        -- hash of content_text
+  text_extractor   text,                            -- which normalizer produced it (+ version)
+  normalized_at    timestamptz,
+
   -- HTTP response metadata (audit)
   http_status      int not null,
   http_headers     jsonb,                           -- ETag, Last-Modified, Content-Type…
@@ -148,13 +169,14 @@ create table extraction_lineage (
 
 ## The lifecycle
 
-```
+```text
 queued
   → resolving        (Crossref: metadata + licence gate)
   → rejected_licence (not open → STOP, never fetched)        [terminal]
   → fetching         (TDM endpoint per publisher)
-  → snapshotted      (raw bytes + sha256 + provenance stored)
-  → extracting       (OpenAI present/absent against the snapshot)
+  → snapshotted      (RAW bytes stored + served_sha256 — the pristine provenance moment)
+  → normalized       (derive text layer from raw; re-derivable; offsets point here)
+  → extracting       (OpenAI present/absent against the text)
   → done             (extraction + per-piece byte-offset lineage written)
   → failed           (retry w/ exponential backoff; dead-letter at max_attempts)
 ```
@@ -180,8 +202,11 @@ queued
 3. **Supersedes prior intake artifacts.** The `papers` table, `uploadPaper`, the public `papers`
    bucket, and the dashboard drop-PDF UI are replaced by this DOI-snapshot model. A migration will
    add these tables; the old upload path is retired.
-4. **Bytes location.** Small text snapshots in `bytea`; large/PDF in object storage with the digest
-   in the row.
+4. **Raw-bytes location.** Small served bytes (XML/text) in `content_raw` (`bytea`); large/binary
+   served bytes (a PDF blob) in object storage via `raw_storage_key`, with `served_sha256` in the row.
+   The derived `content_text` is always in-row.
+5. **Text normalizer.** Which tool derives `content_text` from each `served_format` (a JATS-XML
+   reader; a PDF text-extractor for PDF blobs). Recorded per-snapshot in `text_extractor`.
 
 ## Sources
 
