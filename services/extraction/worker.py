@@ -36,7 +36,7 @@ except ImportError:
 # so credentials don't have to be duplicated under different keys.
 _ALIASES = {
     # Prefer the IPv4-reachable pooler URL over the IPv6-only direct host.
-    "DATABASE_URL": ("SUPABASE_POOLER_URL", "SUPABASE_DB_URL", "DIRECT_URL"),
+    "DATABASE_URL": ("DB_URL", "SUPABASE_POOLER_URL", "SUPABASE_DB_URL", "DIRECT_URL"),
     "SUPABASE_SERVICE_ROLE_KEY": ("SUPABASE_DB_SERVICE_ROLE_KEY",),
 }
 for _canonical, _alts in _ALIASES.items():
