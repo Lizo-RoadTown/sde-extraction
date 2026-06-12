@@ -12,6 +12,7 @@ function mockConfidence(id: string): number {
 import { loadEscalations } from "../data";
 import { PdfPane } from "./PdfPane";
 import { FigurePane } from "./FigurePane";
+import { FingerprintReplay } from "./FingerprintReplay";
 import type { FigureExtraction, Slot } from "../types";
 
 // The slot the verifier is focused on — drives the PDF pane's jump-to-source.
@@ -155,6 +156,9 @@ export function Detail({ ext }: { ext: FigureExtraction }) {
         </div>
         <a href={ext.pdfUrl} className="rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
       </div>
+
+      {/* the lineage made visible: watch the fingerprint assemble from each quoted span */}
+      <FingerprintReplay ext={ext} />
 
       {/* source PDF on top (full width), figure-compare oracle stacked beneath it —
           both need room; side-by-side made the figure images tiny. */}
