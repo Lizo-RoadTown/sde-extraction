@@ -1,65 +1,87 @@
 @import "tailwindcss";
 
+/* Display + body + mono fonts — matches Liz's sites (home / Summer 2026 Hub):
+   Instrument Serif for display, Inter for body, JetBrains Mono for data. */
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
 /* ============================================================
    Design tokens — the single place color/meaning lives.
-   Six semantic roles, one meaning each (per docs/UX_CONTRACT.md).
-   These mirror the colors already used across the app, so adopting
-   them changes nothing visually — it just makes color mean something.
+   Palette lifted from Liz's design system (Summer 2026 Hub theme.js +
+   home _studio.scss): warm near-black, one teal accent used sparingly,
+   semantics desaturated so nothing reads "neon". Token NAMES are unchanged,
+   so re-skinning is this file only — no component edits.
 
    Tailwind v4: anything under @theme becomes a utility, e.g.
    --color-present-* -> bg-present-soft, text-present, border-present.
    ============================================================ */
 @theme {
-  /* Surfaces (dark) */
-  --color-surface: #0f172a;       /* page background (slate-900) */
-  --color-surface-raised: #1e293b; /* cards/panels (slate-800) */
-  --color-edge: #1e293b;          /* borders/dividers (slate-800) */
+  /* Surfaces — warm near-black, not cold blue-slate */
+  --color-surface: #0a0d0e;        /* page background */
+  --color-surface-raised: #16191b; /* cards/panels */
+  --color-inset: #0e1112;          /* wells / sunken areas */
+  --color-edge: #2a2f31;           /* borders/dividers */
 
-  /* Text hierarchy */
-  --color-ink: #e2e8f0;           /* primary text (slate-200) */
-  --color-ink-dim: #94a3b8;       /* secondary text (slate-400) */
-  --color-ink-faint: #64748b;     /* meta text (slate-500) */
+  /* Text hierarchy (high-contrast on warm black) */
+  --color-ink: #f3f5f4;            /* primary */
+  --color-ink-dim: #c4ccca;        /* secondary */
+  --color-ink-faint: #8b9492;      /* meta */
 
-  /* --- The six UX-contract semantics, one meaning each --- */
-  /* present / correct / live — a stated value, verified */
-  --color-present: #6ee7b7;        /* emerald-300 (text) */
-  --color-present-soft: #10b98126; /* emerald-500/15 (fill) */
-  --color-present-edge: #10b9814d; /* emerald-500/30 (border) */
+  /* Fonts as theme tokens (usable as font-display / font-mono if needed) */
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
 
-  /* absent / not-stated — the canon's first-class "no" */
-  --color-absent: #cbd5e1;         /* slate-300 (text) */
-  --color-absent-soft: #33415580;  /* slate-700/50 (fill) */
+  /* --- Six semantics, one meaning each. Teal is THE accent; the rest are
+         muted so the UI reads calm, not neon. --- */
+  /* present / correct / live — a stated, verified value (muted sage, not neon emerald) */
+  --color-present: #7fc8a9;
+  --color-present-soft: #5fd3da14; /* teal tint, ~0.08 */
+  --color-present-edge: #7fc8a93d;
 
-  /* candidate / suboptimal — selected-but-unjudged, or amber warning */
-  --color-attention: #fcd34d;      /* amber-300 (text) */
-  --color-attention-soft: #f59e0b26; /* amber-500/15 (fill) */
-  --color-attention-edge: #f59e0b4d; /* amber-500/30 (border) */
+  /* absent / not-stated — the canon's first-class "no" (warm neutral) */
+  --color-absent: #c4ccca;
+  --color-absent-soft: #2a2f3199;
 
-  /* active / pivot — the current selection / focus accent */
-  --color-active: #67e8f9;         /* cyan-300 (text) */
-  --color-active-soft: #06b6d426;  /* cyan-500/15 (fill) */
-  --color-active-edge: #06b6d480;  /* cyan-500/50 (border) */
+  /* attention / suboptimal — needs-human, requires_inference (muted amber) */
+  --color-attention: #f5c451;
+  --color-attention-soft: #f5c4511f;
+  --color-attention-edge: #f5c4513d;
 
-  /* invalid — hard constraint violation (red flash / block) */
-  --color-invalid: #fca5a5;        /* red-300 (text) */
-  --color-invalid-soft: #ef444426; /* red-500/15 (fill) */
-  --color-invalid-edge: #ef44444d; /* red-500/30 (border) */
+  /* active / pivot — the single teal accent (current selection / focus) */
+  --color-active: #5fd3da;
+  --color-active-soft: #5fd3da1a;  /* the site's signature low-opacity teal fill */
+  --color-active-edge: #5fd3da66;
 
-  /* extra accent (lineage / provenance highlights) */
-  --color-lineage: #c4b5fd;        /* violet-300 (text) */
-  --color-lineage-soft: #8b5cf626; /* violet-500/15 (fill) */
+  /* invalid — hard constraint violation (soft rose, not glaring red) */
+  --color-invalid: #fb7185;
+  --color-invalid-soft: #fb71851f;
+  --color-invalid-edge: #fb71853d;
+
+  /* lineage / provenance — the secondary violet accent, used sparingly */
+  --color-lineage: #b39dff;
+  --color-lineage-soft: #b39dff14;
 }
 
 :root { color-scheme: dark; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: var(--color-surface);
+  /* the signature: warm black with a soft teal bloom at the bottom edge */
+  background:
+    radial-gradient(120% 80% at 50% 120%, #5fd3da12 0%, transparent 60%),
+    var(--color-surface);
+  background-attachment: fixed;
   color: var(--color-ink);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 * { box-sizing: border-box; }
-.mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+.mono { font-family: var(--font-mono); }
+
+/* Serif display — for headings / section titles, like the sites' big serif type.
+   The italic variant is the teal accent word ("Ethics in Tech"). */
+.display { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.01em; }
+.display-accent { font-family: var(--font-display); font-style: italic; color: var(--color-active); }
 
 /* ------------------------------------------------------------
    fill-pop — the entry a slot makes when it resolves to present.

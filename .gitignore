@@ -51,6 +51,8 @@ npm-debug.log*
 # Test / browser artifacts
 .playwright-mcp/
 verify-surface.png
+*-site.jpeg
+dashboard-reskinned.jpeg
 
 # Editor / OS
 .DS_Store

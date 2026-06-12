@@ -29,11 +29,11 @@ export function Process() {
         <div className="flex items-center justify-between gap-2 overflow-x-auto">
           {stages.map((s, i) => (
             <div key={s.key} className="flex items-center gap-2">
-              <div className="flex min-w-[92px] flex-col items-center gap-1 rounded-md border border-slate-700/60 bg-slate-800/40 px-3 py-2">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">{s.label}</span>
-                <span className="text-lg font-semibold text-slate-100">{s.count}</span>
+              <div className="flex min-w-[92px] flex-col items-center gap-1 rounded-md border border-edge bg-surface-raised/50 px-3 py-2">
+                <span className="text-[11px] uppercase tracking-wide text-ink-dim">{s.label}</span>
+                <span className="text-lg font-semibold text-ink">{s.count}</span>
               </div>
-              {i < stages.length - 1 && <span className="text-slate-600">→</span>}
+              {i < stages.length - 1 && <span className="text-ink-faint">→</span>}
             </div>
           ))}
         </div>
@@ -53,25 +53,25 @@ export function Process() {
         <Card className="p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-700/60 text-left text-xs uppercase text-slate-500">
+              <tr className="border-b border-edge text-left text-xs uppercase text-ink-faint">
                 <th className="px-4 py-2">Job</th><th className="px-4 py-2">Stage</th>
                 <th className="px-4 py-2">Progress</th><th className="px-4 py-2">Trace</th>
               </tr>
             </thead>
             <tbody>
               {jobs.map((j) => (
-                <tr key={j.id} className="border-b border-slate-800/60 last:border-0">
-                  <td className="px-4 py-2 text-slate-300">{j.paper} · {j.figure}</td>
+                <tr key={j.id} className="border-b border-edge/60 last:border-0">
+                  <td className="px-4 py-2 text-ink-dim">{j.paper} · {j.figure}</td>
                   <td className="px-4 py-2">
                     <Badge tone={j.stage === "failed" ? "red" : "cyan"}>{j.stage}</Badge>
                   </td>
                   <td className="px-4 py-2">
-                    <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-700">
-                      <div className={j.stage === "failed" ? "h-full bg-red-400" : "h-full bg-cyan-400"} style={{ width: `${Math.round(j.progress * 100)}%` }} />
+                    <div className="h-1.5 w-32 overflow-hidden rounded-full bg-edge">
+                      <div className={j.stage === "failed" ? "h-full bg-invalid" : "h-full bg-active"} style={{ width: `${Math.round(j.progress * 100)}%` }} />
                     </div>
                   </td>
                   <td className="px-4 py-2">
-                    <button className="mono text-xs text-cyan-300 hover:underline">view spans ↗</button>
+                    <button className="mono text-xs text-active hover:underline">view spans ↗</button>
                   </td>
                 </tr>
               ))}
@@ -87,12 +87,12 @@ export function Process() {
         </SectionTitle>
         <Card className="flex items-center justify-between">
           <div>
-            <div className="text-sm text-slate-200">Extractor proposes: tighten σ sourcing to caption-first</div>
-            <div className="text-xs text-slate-500">predicted +6% figure-repro pass · trust 0.81</div>
+            <div className="text-sm text-ink">Extractor proposes: tighten σ sourcing to caption-first</div>
+            <div className="text-xs text-ink-faint">predicted +6% figure-repro pass · trust 0.81</div>
           </div>
           <div className="flex gap-2">
-            <button className="rounded-md bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 hover:bg-emerald-500/30">Approve</button>
-            <button className="rounded-md bg-slate-700/60 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700">Reject</button>
+            <button className="rounded-md bg-present-soft px-3 py-1.5 text-sm text-present hover:brightness-110">Approve</button>
+            <button className="rounded-md bg-edge/60 px-3 py-1.5 text-sm text-ink-dim hover:bg-edge">Reject</button>
           </div>
         </Card>
       </div>

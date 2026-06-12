@@ -9,7 +9,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 }
 
 function Centered({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-screen items-center justify-center text-slate-400">{children}</div>;
+  return <div className="flex min-h-screen items-center justify-center text-ink-dim">{children}</div>;
 }
 
 function Gated({ children }: { children: ReactNode }) {
@@ -43,18 +43,18 @@ function LoginForm() {
 
   return (
     <Centered>
-      <form onSubmit={signIn} className="flex w-72 flex-col gap-3 rounded-lg border border-slate-700/60 bg-slate-800/40 p-6">
+      <form onSubmit={signIn} className="flex w-72 flex-col gap-3 rounded-lg border border-edge bg-surface-raised/50 p-6">
         <div className="text-center">
-          <div className="text-sm font-semibold text-cyan-300">SDE Extraction</div>
-          <div className="text-xs text-slate-500">single team · sign in</div>
+          <div className="text-sm font-semibold text-active">SDE Extraction</div>
+          <div className="text-xs text-ink-faint">single team · sign in</div>
         </div>
         <input type="email" placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-sm text-slate-200" />
+          className="rounded-md border border-edge bg-inset/60 px-3 py-2 text-sm text-ink" />
         <input type="password" placeholder="password" value={password} onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-sm text-slate-200" />
-        {error && <div className="text-xs text-red-300">{error}</div>}
+          className="rounded-md border border-edge bg-inset/60 px-3 py-2 text-sm text-ink" />
+        {error && <div className="text-xs text-invalid">{error}</div>}
         <button type="submit" disabled={busy}
-          className="rounded-md bg-cyan-500/25 py-2 text-sm text-cyan-200 hover:bg-cyan-500/35 disabled:opacity-50">
+          className="rounded-md bg-active-soft py-2 text-sm text-active hover:bg-active-soft disabled:opacity-50">
           {busy ? "…" : "Sign in"}
         </button>
       </form>

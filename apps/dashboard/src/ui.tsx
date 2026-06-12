@@ -7,7 +7,7 @@ export function cx(...c: (string | false | undefined)[]) {
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cx("rounded-lg border border-slate-700/60 bg-slate-800/40 p-4", className)}>
+    <div className={cx("rounded-2xl border border-edge bg-surface-raised/50 p-4", className)}>
       {children}
     </div>
   );
@@ -16,8 +16,8 @@ export function Card({ children, className }: { children: ReactNode; className?:
 export function SectionTitle({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
     <div className="mb-4">
-      <h2 className="text-lg font-semibold text-slate-100">{children}</h2>
-      {hint && <p className="mt-0.5 text-sm text-slate-400">{hint}</p>}
+      <h2 className="display text-2xl text-ink">{children}</h2>
+      {hint && <p className="mt-1 text-sm text-ink-dim">{hint}</p>}
     </div>
   );
 }
@@ -53,7 +53,7 @@ const statTone: Record<string, string> = {
 export function StatCard({ label, value, tone = "slate" }: { label: string; value: ReactNode; tone?: keyof typeof statTone }) {
   return (
     <Card className="flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="text-xs uppercase tracking-wider text-ink-dim">{label}</span>
       <span className={cx("text-2xl font-semibold", statTone[tone])}>{value}</span>
     </Card>
   );
