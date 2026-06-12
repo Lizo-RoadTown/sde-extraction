@@ -1,24 +1,44 @@
-import { useState } from "react";
-import { Papers } from "./surfaces/Papers";
+import { SingleRun } from "./surfaces/SingleRun";
+import { Queue } from "./surfaces/Queue";
 import { Library } from "./surfaces/Library";
 import { ExtractionHealth } from "./surfaces/ExtractionHealth";
+import { VerifyPage } from "./surfaces/VerifyPage";
 import { cx } from "./ui";
 import { AuthGate } from "./auth";
 import { usePreview, setPreview } from "./usePreview";
+import { useRoute, matchVerify, Link } from "./router";
 
-// Organized by the real work motion: add a paper + verify it (one surface),
-// browse the verified archive, and the engine's telemetry/confidence.
-type Surface = "papers" | "library" | "health";
-
-const NAV: { key: Surface; label: string; blurb: string }[] = [
-  { key: "papers", label: "Papers", blurb: "add · verify" },
-  { key: "library", label: "Library", blurb: "verified models" },
-  { key: "health", label: "Extraction Health", blurb: "telemetry · confidence" },
+// Real routing (hash-based) so every view is a back-able URL. The work splits in two:
+// a Single-run page that does one paper end to end inline, and a Queue page for batches
+// where each item opens its own verify page.
+const NAV: { to: string; label: string; blurb: string }[] = [
+  { to: "/", label: "Single run", blurb: "one paper · verify inline" },
+  { to: "/queue", label: "Queue", blurb: "batch · awaiting review" },
+  { to: "/library", label: "Library", blurb: "verified models" },
+  { to: "/health", label: "Extraction Health", blurb: "telemetry · confidence" },
 ];
 
+function isActive(route: string, to: string): boolean {
+  return to === "/" ? route === "/" : route === to || route.startsWith(to + "/");
+}
+
+function CurrentView({ route }: { route: string }) {
+  const verifyId = matchVerify(route);
+  if (verifyId) return <VerifyPage id={verifyId} />;
+  if (route === "/queue") return <Queue />;
+  if (route === "/library") return <Library />;
+  if (route === "/health") return <ExtractionHealth />;
+  return <SingleRun />; // "/" and any unknown route
+}
+
+function currentLabel(route: string): string {
+  if (matchVerify(route)) return "Verify";
+  return NAV.find((n) => isActive(route, n.to))?.label ?? "Single run";
+}
+
 export default function App() {
-  const [surface, setSurface] = useState<Surface>("papers");
   const preview = usePreview();
+  const route = useRoute();
 
   return (
     <AuthGate>
@@ -36,20 +56,19 @@ export default function App() {
         </div>
         <nav className="flex flex-col gap-1">
           {NAV.map((n) => (
-            <button
-              type="button"
-              key={n.key}
-              onClick={() => setSurface(n.key)}
+            <Link
+              key={n.to}
+              to={n.to}
               className={cx(
                 "rounded-lg px-3 py-2 text-left text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active",
-                surface === n.key
+                isActive(route, n.to)
                   ? "bg-active-soft text-active"
                   : "text-ink-dim hover:bg-surface-raised/60",
               )}
             >
               <div className="font-medium">{n.label}</div>
               <div className="text-[11px] text-ink-faint">{n.blurb}</div>
-            </button>
+            </Link>
           ))}
         </nav>
         <div className="mt-auto px-2 pb-2 text-[11px] text-ink-faint">single team · MVP</div>
@@ -58,9 +77,7 @@ export default function App() {
       {/* main */}
       <div className="flex flex-1 flex-col">
         <header className="flex h-13 items-center justify-between border-b border-edge px-6 py-3">
-          <div className="text-sm text-ink-dim">
-            {NAV.find((n) => n.key === surface)?.label}
-          </div>
+          <div className="text-sm text-ink-dim">{currentLabel(route)}</div>
           <div className="flex items-center gap-3 text-xs text-ink-dim">
             <PreviewToggle />
             <span className="flex items-center gap-1.5">
@@ -71,9 +88,7 @@ export default function App() {
           </div>
         </header>
         <main className="flex-1 overflow-auto p-6">
-          {surface === "papers" && <Papers />}
-          {surface === "library" && <Library />}
-          {surface === "health" && <ExtractionHealth />}
+          <CurrentView route={route} />
         </main>
       </div>
     </div>

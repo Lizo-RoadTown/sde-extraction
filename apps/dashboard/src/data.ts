@@ -103,18 +103,50 @@ export interface JobTarget {
 
 /**
  * Enqueue an extraction job the worker will drain. Inserts an `extraction_jobs` row
- * (status defaults to 'queued'; target carries the Intake mode). Mock mode (no Supabase)
- * is a no-op that resolves false, so the UI degrades gracefully.
+ * (status defaults to 'queued'; target carries the Intake mode) and returns the new job
+ * id so the caller can poll it (the single-run page does this). Mock mode (no Supabase)
+ * resolves null, so the UI degrades gracefully.
  */
-export async function enqueueJob(paperId: string, figureLabel: string, target: JobTarget): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase.from("extraction_jobs").insert({
-    paper_id: paperId,
-    figure_label: figureLabel,
-    stage: "queued",
-    target,
-  });
-  return !error;
+export async function enqueueJob(paperId: string, figureLabel: string, target: JobTarget): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("extraction_jobs")
+    .insert({ paper_id: paperId, figure_label: figureLabel, stage: "queued", target })
+    .select("id")
+    .single();
+  if (error || !data) { if (error) console.error("enqueueJob:", error.message); return null; }
+  return String(data.id);
+}
+
+// The live job stage — polled by the single-run page to show progress and to know when
+// the worker has stored the result (stage === 'stored').
+export interface JobStageInfo { stage: string; progress: number; error: string | null; }
+
+export async function loadJobStage(jobId: string): Promise<JobStageInfo | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("extraction_jobs")
+    .select("stage, progress, error")
+    .eq("id", jobId)
+    .single();
+  if (error || !data) { if (error) console.error("loadJobStage:", error.message); return null; }
+  return { stage: String(data.stage), progress: Number(data.progress), error: (data.error as string | null) ?? null };
+}
+
+/** The newest extraction for a paper — how the single-run page picks up its result. */
+export async function loadLatestExtraction(paperId: string): Promise<FigureExtraction | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("extractions")
+    .select("*")
+    .eq("paper_id", paperId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) {
+    if (error) console.error("loadLatestExtraction:", error.message);
+    return null;
+  }
+  return rowToExtraction(data[0]);
 }
 
 // A unified work item for the Papers surface: one (paper, figure) with a real,
