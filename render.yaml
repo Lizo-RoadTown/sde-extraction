@@ -2,9 +2,9 @@
 # traffic), built from its Dockerfile. Syntax verified against render.com/docs/blueprint-spec
 # (2026-06-12): type=worker, runtime=docker.
 #
-# This is the FIRST infra-as-code in the repo. The dashboard's own Render service is
-# currently configured in the Render dashboard (not here) — worth adding as a static
-# site service later so the whole deploy is declared in one place.
+# This is the FIRST infra-as-code in the repo. It covers ONLY the worker. The dashboard
+# (apps/dashboard) deploys separately on VERCEL (project "sde-extraction", auto-deploy on
+# push to main) — it is not a Render service and is not declared here.
 #
 # Secrets (OPENAI_API_KEY, DATABASE_URL, SUPABASE_*) are NOT committed — set them in the
 # Render dashboard (sync:false marks them as dashboard-managed).
