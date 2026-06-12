@@ -89,6 +89,30 @@ function rowToExtraction(row: Record<string, unknown>): FigureExtraction {
   };
 }
 
+// The Intake targeting choice that rides on a queued job (the worker's processor
+// branches on target.mode — services/extraction/processor.py).
+export interface JobTarget {
+  mode: "auto" | "figure" | "model" | "whole";
+  figure_ref?: string;
+  model_desc?: string;
+}
+
+/**
+ * Enqueue an extraction job the worker will drain. Inserts an `extraction_jobs` row
+ * (status defaults to 'queued'; target carries the Intake mode). Mock mode (no Supabase)
+ * is a no-op that resolves false, so the UI degrades gracefully.
+ */
+export async function enqueueJob(paperId: string, figureLabel: string, target: JobTarget): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from("extraction_jobs").insert({
+    paper_id: paperId,
+    figure_label: figureLabel,
+    stage: "queued",
+    target,
+  });
+  return !error;
+}
+
 export async function loadEscalations(): Promise<FigureExtraction[]> {
   if (!supabase) return mock.escalations;
   const { data, error } = await supabase.from("extractions").select("*").eq("status", "needs_human");

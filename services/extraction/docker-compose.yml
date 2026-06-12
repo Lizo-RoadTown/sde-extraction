@@ -1,0 +1,13 @@
+# Local run of the extraction worker. Connects to your Supabase Postgres via the
+# DATABASE_URL in .env. `docker compose up` starts the daemon; it polls and idles
+# gracefully if DATABASE_URL is unset.
+services:
+  extraction-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

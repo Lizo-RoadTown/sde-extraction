@@ -1,0 +1,33 @@
+# Render Blueprint — deploys the extraction worker as a background worker (no inbound
+# traffic), built from its Dockerfile. Syntax verified against render.com/docs/blueprint-spec
+# (2026-06-12): type=worker, runtime=docker.
+#
+# This is the FIRST infra-as-code in the repo. The dashboard's own Render service is
+# currently configured in the Render dashboard (not here) — worth adding as a static
+# site service later so the whole deploy is declared in one place.
+#
+# Secrets (OPENAI_API_KEY, DATABASE_URL, SUPABASE_*) are NOT committed — set them in the
+# Render dashboard (sync:false marks them as dashboard-managed).
+services:
+  - name: sde-extraction-worker
+    type: worker
+    runtime: docker
+    rootDir: ./services/extraction
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/extraction
+    autoDeploy: true
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: POLL_INTERVAL
+        value: "30"
+      - key: OPENAI_MODEL
+        value: gpt-4o-2024-08-06
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

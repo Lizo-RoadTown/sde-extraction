@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, SectionTitle, Badge, StatCard, cx } from "../ui";
-import { loadJobs, uploadPaper, type UploadedPaper } from "../data";
+import { loadJobs, uploadPaper, enqueueJob, type UploadedPaper, type JobTarget } from "../data";
 import { supabaseConfigured } from "../lib/supabase";
 import type { Job } from "../types";
 
@@ -67,6 +67,23 @@ export function Intake() {
     } catch (e) {
       setUpload({ kind: "error", message: e instanceof Error ? e.message : "Upload failed." });
     }
+  }
+
+  // The uploaded paper's id (present once upload succeeds against Supabase).
+  const paperId = upload.kind === "done" ? upload.paper.paperId : null;
+  const [enqueued, setEnqueued] = useState<string | null>(null);
+
+  async function startExtraction() {
+    if (!paperId) return; // need an uploaded paper to attach the job to
+    const target: JobTarget =
+      mode === "figure" ? { mode, figure_ref: figureRef }
+      : mode === "model" ? { mode, model_desc: modelDesc }
+      : { mode }; // auto | whole
+    const labels = mode === "auto" ? (picked.length ? picked : ["(auto)"]) : [figureRef || "(target)"];
+    let ok = false;
+    for (const label of labels) ok = (await enqueueJob(paperId, label, target)) || ok;
+    setEnqueued(ok ? `Queued ${labels.length} job${labels.length === 1 ? "" : "s"} →` : "Queue failed (no DB?)");
+    loadJobs().then(setJobs);
   }
 
   return (
@@ -186,12 +203,19 @@ export function Intake() {
             </div>
           )}
 
-          <button type="button" className="mt-3 w-full rounded-md bg-active-soft py-2 text-sm text-active hover:brightness-110">
+          <button
+            type="button"
+            onClick={startExtraction}
+            disabled={!paperId}
+            title={paperId ? undefined : "Upload a paper first"}
+            className="mt-3 w-full rounded-md bg-active-soft py-2 text-sm text-active transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             {mode === "auto" ? `Extract ${picked.length} figure${picked.length === 1 ? "" : "s"} →`
               : mode === "figure" ? "Extract this figure →"
               : mode === "model" ? "Find this model →"
               : "Extract whole paper →"}
           </button>
+          {enqueued && <div className="mt-2 text-center text-xs text-ink-dim">{enqueued}</div>}
         </Card>
       </div>
 
