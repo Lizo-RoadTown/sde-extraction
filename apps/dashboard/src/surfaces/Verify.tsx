@@ -1,24 +1,81 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, SectionTitle, Badge, SlotView, cx } from "../ui";
 import { loadEscalations } from "../data";
-import type { FigureExtraction, NamedSlot } from "../types";
+import type { FigureExtraction, NamedSlot, Slot } from "../types";
 
-function SlotRow({ row }: { row: NamedSlot }) {
+// The verifier's judgment on one slot. "unjudged" is a real, distinct state —
+// per docs/UX_CONTRACT.md, judged-absent must never look like not-yet-reviewed.
+type Judgment = "unjudged" | "present" | "absent";
+
+function SlotRow({
+  row,
+  judgment,
+  onJudge,
+}: {
+  row: NamedSlot;
+  judgment: Judgment;
+  onJudge: (j: "present" | "absent") => void;
+}) {
+  const engineSays: Slot["status"] = row.slot.status;
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-800/60 py-2 last:border-0">
+    <div
+      className={cx(
+        "flex items-start justify-between gap-4 border-b border-edge/60 py-2 last:border-0",
+        judgment === "unjudged" && "opacity-95", // subtle: still needs a decision
+      )}
+    >
       <div className="flex items-start gap-3">
-        <span className="mono mt-0.5 w-16 text-sm text-cyan-300">{row.symbol}</span>
+        <span className="mono mt-0.5 w-16 text-sm text-active">{row.symbol}</span>
         <SlotView slot={row.slot} />
       </div>
-      {/* present/absent control — the core interaction */}
+      {/* present/absent control — the core interaction. The verifier confirms or overrides
+          what the engine extracted; the chosen button lights with its semantic color. */}
       <div className="flex shrink-0 items-center gap-1">
-        <button className={cx("rounded px-2 py-1 text-xs", row.slot.status === "present" ? "bg-emerald-500/25 text-emerald-200" : "bg-slate-700/50 text-slate-400")}>present</button>
-        <button className={cx("rounded px-2 py-1 text-xs", row.slot.status === "absent" ? "bg-amber-500/25 text-amber-200" : "bg-slate-700/50 text-slate-400")}>absent</button>
+        <button
+          type="button"
+          aria-pressed={judgment === "present"}
+          onClick={() => onJudge("present")}
+          className={cx(
+            "rounded px-2 py-1 text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active",
+            judgment === "present"
+              ? "bg-present-soft text-present"
+              : "bg-absent-soft text-ink-dim hover:text-ink",
+          )}
+        >
+          present
+        </button>
+        <button
+          type="button"
+          aria-pressed={judgment === "absent"}
+          onClick={() => onJudge("absent")}
+          className={cx(
+            "rounded px-2 py-1 text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-attention",
+            judgment === "absent"
+              ? "bg-attention-soft text-attention"
+              : "bg-absent-soft text-ink-dim hover:text-ink",
+          )}
+        >
+          absent
+        </button>
         {row.slot.status === "absent" && (
-          <select aria-label="absence reason" defaultValue={row.slot.reason} className="rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-300">
+          <select
+            aria-label="absence reason"
+            defaultValue={row.slot.reason}
+            className="rounded bg-surface-raised px-1.5 py-1 text-xs text-ink-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
+          >
             <option value="not_stated">not_stated</option>
             <option value="requires_inference">requires_inference</option>
           </select>
+        )}
+        {/* unjudged marker — the decision the verifier still owes this slot */}
+        {judgment === "unjudged" && (
+          <span
+            className="ml-1 inline-flex items-center"
+            title={`engine extracted "${engineSays}" — confirm or override`}
+            aria-label="not yet judged"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-attention" />
+          </span>
         )}
       </div>
     </div>
@@ -26,49 +83,83 @@ function SlotRow({ row }: { row: NamedSlot }) {
 }
 
 function Detail({ ext }: { ext: FigureExtraction }) {
-  const rows: NamedSlot[] = [
-    ...ext.stateVariables,
-    ...ext.parameters,
-    ...ext.driftTerms.map((d) => ({ symbol: `drift ${d.variable}`, slot: d.slot })),
-    ...ext.diffusionTerms.map((d) => ({ symbol: `diff ${d.variable}`, slot: d.slot })),
-  ];
+  const rows: NamedSlot[] = useMemo(
+    () => [
+      ...ext.stateVariables,
+      ...ext.parameters,
+      ...ext.driftTerms.map((d) => ({ symbol: `drift ${d.variable}`, slot: d.slot })),
+      ...ext.diffusionTerms.map((d) => ({ symbol: `diff ${d.variable}`, slot: d.slot })),
+    ],
+    [ext],
+  );
+
+  // Verifier judgments, keyed by row index. (Detail is mounted with key={ext.id} by the
+  // parent, so switching extractions remounts this fresh — no manual reset needed.)
+  const [judgments, setJudgments] = useState<Record<number, "present" | "absent">>({});
+
+  const judgedCount = Object.keys(judgments).length;
+  const allJudged = judgedCount === rows.length;
+
   return (
     <div className="flex flex-1 flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-medium text-slate-100">{ext.paperTitle}</div>
-          <div className="text-xs text-slate-500">{ext.figureLabel} · {ext.pathogen} · {ext.doi}</div>
+          <div className="text-sm font-medium text-ink">{ext.paperTitle}</div>
+          <div className="text-xs text-ink-faint">{ext.figureLabel} · {ext.pathogen} · {ext.doi}</div>
         </div>
-        <a href={ext.pdfUrl} className="rounded-md bg-slate-700/60 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700">open PDF ↗</a>
+        <a href={ext.pdfUrl} className="rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
       </div>
 
-      {/* two panes: source + figure-compare (the build proves never had) */}
+      {/* two panes: source + figure-compare. Stubs today — labeled as such per the UX contract
+          (a placeholder that announces itself beats a silent blank that reads as broken). */}
       <div className="grid grid-cols-2 gap-4">
-        <Card className="flex h-40 flex-col items-center justify-center border-dashed text-center text-xs text-slate-500">
-          <div className="text-2xl">🔍</div>
+        <Card className="flex h-40 flex-col items-center justify-center border-dashed text-center text-xs text-ink-faint">
+          <span className="mb-1 rounded bg-surface-raised px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-dim">not built yet</span>
           PDF viewer — jump-to-source highlight<br />(offset-anchored span)
         </Card>
-        <Card className="flex h-40 flex-col items-center justify-center border-dashed text-center text-xs text-slate-500">
-          <div className="text-2xl">📊</div>
+        <Card className="flex h-40 flex-col items-center justify-center border-dashed text-center text-xs text-ink-faint">
+          <span className="mb-1 rounded bg-surface-raised px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-dim">not built yet</span>
           Figure compare — paper vs. regenerated<br />the verification oracle
         </Card>
       </div>
 
       <Card>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-200">Slots — confirm present / absent</span>
-          <span className="text-xs text-slate-500">{rows.filter((r) => r.slot.status === "present").length}/{rows.length} present</span>
+          <span className="text-sm font-medium text-ink">Slots — confirm present / absent</span>
+          <span className="text-xs text-ink-faint">{judgedCount}/{rows.length} judged</span>
         </div>
-        {rows.map((r, i) => <SlotRow key={i} row={r} />)}
-        <div className="mt-3 flex items-center justify-between rounded-md bg-slate-800/40 px-3 py-2">
-          <span className="text-xs text-slate-400">Figure binding — “which values made this figure?”</span>
+        {rows.map((r, i) => (
+          <SlotRow
+            key={i}
+            row={r}
+            judgment={judgments[i] ?? "unjudged"}
+            onJudge={(j) => setJudgments((prev) => ({ ...prev, [i]: j }))}
+          />
+        ))}
+        <div className="mt-3 flex items-center justify-between rounded-md bg-surface-raised/60 px-3 py-2">
+          <span className="text-xs text-ink-dim">Figure binding — “which values made this figure?”</span>
           <SlotView slot={ext.figureBinding} />
         </div>
       </Card>
 
-      <div className="flex justify-end gap-2">
-        <button className="rounded-md bg-slate-700/60 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700">Send back</button>
-        <button className="rounded-md bg-emerald-500/25 px-4 py-2 text-sm text-emerald-200 hover:bg-emerald-500/35">Approve & store</button>
+      <div className="flex items-center justify-end gap-3">
+        {/* rule zero: the verifier commits to every slot before the system lets them store. */}
+        {!allJudged && (
+          <span className="text-xs text-ink-faint">{rows.length - judgedCount} slot(s) still need a judgment</span>
+        )}
+        <button type="button" className="rounded-md bg-surface-raised px-4 py-2 text-sm text-ink hover:bg-edge">Send back</button>
+        <button
+          type="button"
+          disabled={!allJudged}
+          className={cx(
+            "rounded-md px-4 py-2 text-sm transition",
+            allJudged
+              ? "bg-present-soft text-present hover:brightness-110"
+              : "cursor-not-allowed bg-absent-soft text-ink-faint opacity-50",
+          )}
+        >
+          Approve &amp; store
+        </button>
       </div>
     </div>
   );
@@ -85,7 +176,7 @@ export function Verify() {
   }, []);
   const ext = escalations.find((e) => e.id === selected);
 
-  if (!ext) return <div className="p-6 text-sm text-slate-400">No escalations in the queue.</div>;
+  if (!ext) return <div className="p-6 text-sm text-ink-dim">No escalations in the queue.</div>;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
@@ -96,15 +187,15 @@ export function Verify() {
         {/* escalation inbox */}
         <div className="flex w-64 shrink-0 flex-col gap-2">
           {escalations.map((e) => (
-            <button key={e.id} onClick={() => setSelected(e.id)}
-              className={cx("rounded-md border p-3 text-left", e.id === selected ? "border-cyan-500/50 bg-cyan-500/10" : "border-slate-700/60 bg-slate-800/40 hover:bg-slate-800/70")}>
-              <div className="text-sm text-slate-200">{e.figureLabel}</div>
-              <div className="truncate text-xs text-slate-500">{e.paperTitle}</div>
+            <button type="button" key={e.id} onClick={() => setSelected(e.id)}
+              className={cx("rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active", e.id === selected ? "border-active-edge bg-active-soft" : "border-edge bg-surface-raised/40 hover:bg-surface-raised/70")}>
+              <div className="text-sm text-ink">{e.figureLabel}</div>
+              <div className="truncate text-xs text-ink-faint">{e.paperTitle}</div>
               <div className="mt-1"><Badge tone="amber">needs human</Badge></div>
             </button>
           ))}
         </div>
-        <Detail ext={ext} />
+        <Detail key={ext.id} ext={ext} />
       </div>
     </div>
   );

@@ -60,3 +60,19 @@ body {
 }
 * { box-sizing: border-box; }
 .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+
+/* ------------------------------------------------------------
+   fill-pop — the entry a slot makes when it resolves to present.
+   transform/opacity only (no layout thrash); honours reduced-motion.
+   Per docs/UX_CONTRACT.md: present "fills", absent is a marked state.
+   ------------------------------------------------------------ */
+@keyframes fill-pop {
+  from { opacity: 0; transform: translateY(2px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.fill-pop { animation: fill-pop 200ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fill-pop { animation: none; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

@@ -60,23 +60,34 @@ export function StatCard({ label, value, tone = "slate" }: { label: string; valu
 }
 
 // The heart of our model in the UI: a slot is present (value + lineage) or absent (a reason).
+// Per docs/UX_CONTRACT.md, present / absent must be visually unambiguous — never blank:
+//  - present  -> a filled card that "fill-pop"s in (the value, its meaning, source, lineage)
+//  - absent   -> a marked state with its reason, rendered as a dashed "?" slot (a decision,
+//                not a missing hole). not_stated is neutral; requires_inference is attention.
 export function SlotView({ slot }: { slot: Slot }) {
   if (slot.status === "absent") {
+    const attention = slot.reason === "requires_inference";
     return (
-      <div className="flex items-center gap-2">
-        <Badge tone={slot.reason === "not_stated" ? "slate" : "amber"}>absent</Badge>
-        <span className="mono text-xs text-slate-400">{slot.reason}</span>
+      <div
+        className={cx(
+          "fill-pop inline-flex items-center gap-2 rounded-md border border-dashed px-2 py-1",
+          attention ? "border-attention-edge bg-attention-soft" : "border-edge bg-absent-soft",
+        )}
+      >
+        <span className={cx("mono text-sm", attention ? "text-attention" : "text-ink-faint")}>?</span>
+        <Badge tone={attention ? "amber" : "slate"}>absent</Badge>
+        <span className="mono text-xs text-ink-dim">{slot.reason}</span>
       </div>
     );
   }
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="fill-pop flex flex-col gap-0.5">
       <div className="flex items-center gap-2">
-        <span className="mono text-sm text-slate-100">{slot.value}</span>
+        <span className="mono text-sm text-ink">{slot.value}</span>
         <Badge tone="green">present</Badge>
       </div>
-      <span className="text-xs text-slate-400">{slot.meaning}</span>
-      <span className="mono text-[11px] text-slate-500">
+      <span className="text-xs text-ink-dim">{slot.meaning}</span>
+      <span className="mono text-[11px] text-ink-faint">
         “{slot.quote}” · p.{slot.page}{slot.sha256 ? ` · sha256 ${slot.sha256}` : ""}
       </span>
     </div>
