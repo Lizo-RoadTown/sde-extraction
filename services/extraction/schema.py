@@ -78,8 +78,8 @@ class Absent(BaseModel):
     reason: AbsenceReason
 
 
-# Forced: every slot is present OR absent. Discriminated on `status` for strict mode.
-# [LIZ-APPROVED REVISION]
+# Forced: every slot is present OR absent. Plain Union -> anyOf (OpenAI structured
+# outputs rejects oneOf, which discriminator= would emit). [LIZ-APPROVED REVISION]
 Slot = Union[Present, Absent]
 
 
@@ -93,14 +93,14 @@ class StateVariable(BaseModel):
     """A compartment the model tracks, plus its initial value.  [UNDER REVIEW]"""
 
     symbol: str                                       # e.g. "S" — part of the document-map
-    initial_value: Slot = Field(discriminator="status")
+    initial_value: Slot
 
 
 class Parameter(BaseModel):
     """A named constant, plus its value.  [UNDER REVIEW]"""
 
     symbol: str                                       # e.g. "mu"
-    value: Slot = Field(discriminator="status")
+    value: Slot
 
 
 class Equation(BaseModel):
@@ -111,13 +111,13 @@ class Equation(BaseModel):
     """
 
     variable: str                                     # which state variable this change-term is for
-    expression: Slot = Field(discriminator="status")
+    expression: Slot
 
 
 class FigureBinding(BaseModel):
     """'Which values produced this figure?' — itself present or absent (often a no).  [UNDER REVIEW]"""
 
-    uses_values: Slot = Field(discriminator="status")
+    uses_values: Slot
 
 
 class FigureExtraction(BaseModel):
@@ -129,8 +129,8 @@ class FigureExtraction(BaseModel):
     the main open piece between this schema and the full canon.
     """
 
-    paper_title: Slot = Field(discriminator="status")
-    pathogen: Slot = Field(discriminator="status")
+    paper_title: Slot
+    pathogen: Slot
     figure_label: str
     state_variables: list[StateVariable]
     parameters: list[Parameter]
