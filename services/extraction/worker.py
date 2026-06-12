@@ -19,6 +19,33 @@ import argparse
 import os
 import time
 
+# Load a .env into the environment for direct `python worker.py` runs (Docker uses
+# env_file instead). Checks this dir first, then the repo root, so the worker can
+# reuse the project-root .env. Must run BEFORE importing db (which reads os.environ).
+try:
+    from dotenv import load_dotenv
+    _here = os.path.dirname(os.path.abspath(__file__))
+    for _p in (os.path.join(_here, ".env"), os.path.join(_here, "..", "..", ".env")):
+        if os.path.exists(_p):
+            load_dotenv(_p, override=False)
+            break
+except ImportError:
+    pass
+
+# Accept the repo-root .env's variable names as aliases for the worker's names,
+# so credentials don't have to be duplicated under different keys.
+_ALIASES = {
+    # Prefer the IPv4-reachable pooler URL over the IPv6-only direct host.
+    "DATABASE_URL": ("SUPABASE_POOLER_URL", "SUPABASE_DB_URL", "DIRECT_URL"),
+    "SUPABASE_SERVICE_ROLE_KEY": ("SUPABASE_DB_SERVICE_ROLE_KEY",),
+}
+for _canonical, _alts in _ALIASES.items():
+    if not os.environ.get(_canonical):
+        for _alt in _alts:
+            if os.environ.get(_alt):
+                os.environ[_canonical] = os.environ[_alt]
+                break
+
 import db
 import processor
 
