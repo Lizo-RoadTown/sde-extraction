@@ -44,6 +44,12 @@ export function Library() {
         ))}
       </div>
 
+      {library.length === 0 && (
+        <Card className="py-12 text-center text-sm text-ink-faint">
+          No verified models yet. Extractions appear here once they pass human verification.
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {library.map((m) => (
           <Card key={m.id} className="flex flex-col gap-2 hover:border-active-edge">

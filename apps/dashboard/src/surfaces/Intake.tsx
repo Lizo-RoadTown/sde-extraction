@@ -277,6 +277,13 @@ export function Intake() {
               </tr>
             </thead>
             <tbody>
+              {jobs.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-xs text-ink-faint">
+                    No jobs yet. Upload a paper and start an extraction — it’ll appear here as the worker processes it.
+                  </td>
+                </tr>
+              )}
               {jobs.map((j) => (
                 <tr key={j.id} className="border-b border-edge/60 last:border-0">
                   <td className="px-4 py-2 text-ink-dim">{j.paper}</td>

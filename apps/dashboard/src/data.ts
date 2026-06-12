@@ -1,8 +1,9 @@
-// Single data layer: query Supabase when configured, else fall back to mock data.
-// Surfaces import from here, so going live = setting env vars (no component changes).
+// Single data layer: query Supabase and return REAL backend state. No mock fallback —
+// the dashboard shows what's actually in the database, including honest empty states.
+// (If Supabase isn't configured, these return empty; the AuthGate prevents that on
+// the deployed site by requiring login first.)
 
 import { supabase } from "./lib/supabase";
-import * as mock from "./mock";
 import type { FigureExtraction, Job } from "./types";
 
 // ---- PDF storage: fingerprint, upload, signed URL ----------------------------
@@ -114,27 +115,27 @@ export async function enqueueJob(paperId: string, figureLabel: string, target: J
 }
 
 export async function loadEscalations(): Promise<FigureExtraction[]> {
-  if (!supabase) return mock.escalations;
+  if (!supabase) return [];
   const { data, error } = await supabase.from("extractions").select("*").eq("status", "needs_human");
-  if (error || !data?.length) return mock.escalations;
-  return data.map(rowToExtraction);
+  if (error) { console.error("loadEscalations:", error.message); return []; }
+  return (data ?? []).map(rowToExtraction);
 }
 
 export async function loadLibrary(): Promise<FigureExtraction[]> {
-  if (!supabase) return mock.library;
+  if (!supabase) return [];
   const { data, error } = await supabase.from("extractions").select("*").eq("status", "verified");
-  if (error || !data?.length) return mock.library;
-  return data.map(rowToExtraction);
+  if (error) { console.error("loadLibrary:", error.message); return []; }
+  return (data ?? []).map(rowToExtraction);
 }
 
 export async function loadJobs(): Promise<Job[]> {
-  if (!supabase) return mock.jobs;
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from("extraction_jobs")
     .select("*, papers(title)")
     .order("updated_at", { ascending: false });
-  if (error || !data?.length) return mock.jobs;
-  return data.map((r: Record<string, unknown>) => ({
+  if (error) { console.error("loadJobs:", error.message); return []; }
+  return (data ?? []).map((r: Record<string, unknown>) => ({
     id: String(r.id),
     paper: ((r.papers as { title?: string } | null)?.title) ?? "—",
     figure: String(r.figure_label),
