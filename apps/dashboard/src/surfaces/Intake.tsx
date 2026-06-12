@@ -16,6 +16,10 @@ const stageLabel: Record<string, string> = {
   machine_verify: "Machine verify", human_verify: "Human verify", stored: "Stored", failed: "Failed",
 };
 
+// The engine's pipeline stages, shown as a live flow (relocated from the old Process
+// surface). "Watch it work" lives here — where you dropped the papers.
+const PIPELINE = ["ingest", "pdf_to_math", "extract", "machine_verify", "human_verify", "stored"] as const;
+
 type UploadState =
   | { kind: "idle" }
   | { kind: "working"; step: string; filename: string }
@@ -133,12 +137,53 @@ export function Intake() {
       </div>
 
       <div>
-        <SectionTitle>Intake queue</SectionTitle>
+        <SectionTitle hint="Watch papers move through the engine. Small batches tick through live; large batches show overall progress.">
+          Processing
+        </SectionTitle>
+
+        {/* live pipeline flow — per-stage counts of what's in flight (from Process) */}
+        <Card className="mb-4">
+          <div className="flex items-center justify-between gap-1 overflow-x-auto">
+            {PIPELINE.map((stage, i) => {
+              const count = jobs.filter((j) => j.stage === stage).length;
+              return (
+                <div key={stage} className="flex items-center gap-1">
+                  <div className="flex min-w-[88px] flex-col items-center gap-1 rounded-lg border border-edge bg-surface-raised/40 px-3 py-2">
+                    <span className="text-[10px] uppercase tracking-wide text-ink-faint">{stageLabel[stage]}</span>
+                    <span className={cx("text-lg font-semibold", count > 0 ? "text-active" : "text-ink-faint")}>{count}</span>
+                  </div>
+                  {i < PIPELINE.length - 1 && <span className="text-ink-faint">→</span>}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* batch progress — only meaningful when there's volume; scales the same view */}
+        {(() => {
+          const total = jobs.length;
+          const done = jobs.filter((j) => j.stage === "stored").length;
+          const failed = jobs.filter((j) => j.stage === "failed").length;
+          const inFlight = total - done - failed;
+          if (total <= 3) return null; // small: the flow + table is enough
+          const pct = total ? Math.round((done / total) * 100) : 0;
+          return (
+            <Card className="mb-4 flex items-center gap-4">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-inset">
+                <div className="h-full bg-present" style={{ width: `${pct}%` }} />
+              </div>
+              <span className="shrink-0 text-xs text-ink-dim">
+                {done} of {total} done · {inFlight} in flight{failed ? ` · ${failed} failed` : ""}
+              </span>
+            </Card>
+          );
+        })()}
+
         <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard label="Queued" value="1" />
-          <StatCard label="Processing" value="3" tone="cyan" />
-          <StatCard label="Done today" value="12" tone="green" />
-          <StatCard label="Failed" value="1" tone="red" />
+          <StatCard label="In flight" value={jobs.filter((j) => !["stored", "failed"].includes(j.stage)).length} tone="cyan" />
+          <StatCard label="Stored" value={jobs.filter((j) => j.stage === "stored").length} tone="green" />
+          <StatCard label="Failed" value={jobs.filter((j) => j.stage === "failed").length} tone="red" />
+          <StatCard label="Total" value={jobs.length} />
         </div>
         <Card className="p-0">
           <table className="w-full text-sm">

@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { Intake } from "./surfaces/Intake";
-import { Process } from "./surfaces/Process";
 import { Verify } from "./surfaces/Verify";
 import { Library } from "./surfaces/Library";
+import { ExtractionHealth } from "./surfaces/ExtractionHealth";
 import { cx } from "./ui";
 import { AuthGate } from "./auth";
 
-type Surface = "intake" | "process" | "verify" | "library";
+// Organized by what a human does, not by pipeline stage (Process dissolved —
+// see docs/superpowers/specs/2026-06-12-dashboard-nav-redesign-design.md).
+type Surface = "intake" | "verify" | "library" | "health";
 
 const NAV: { key: Surface; label: string; blurb: string }[] = [
-  { key: "intake", label: "Intake", blurb: "PDF in" },
-  { key: "process", label: "Process", blurb: "watch the engine" },
+  { key: "intake", label: "Intake", blurb: "add papers · watch them process" },
   { key: "verify", label: "Verify", blurb: "present / absent + figure" },
   { key: "library", label: "Library", blurb: "verified models" },
+  { key: "health", label: "Extraction Health", blurb: "confidence · self-update" },
 ];
 
 export default function App() {
@@ -64,9 +66,9 @@ export default function App() {
         </header>
         <main className="flex-1 overflow-auto p-6">
           {surface === "intake" && <Intake />}
-          {surface === "process" && <Process />}
           {surface === "verify" && <Verify />}
           {surface === "library" && <Library />}
+          {surface === "health" && <ExtractionHealth />}
         </main>
       </div>
     </div>
