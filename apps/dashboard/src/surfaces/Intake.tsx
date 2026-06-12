@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { Card, SectionTitle, Badge, StatCard } from "../ui";
-import { loadJobs } from "../data";
+import { useEffect, useRef, useState } from "react";
+import { Card, SectionTitle, Badge, StatCard, cx } from "../ui";
+import { loadJobs, uploadPaper, type UploadedPaper } from "../data";
+import { supabaseConfigured } from "../lib/supabase";
 import type { Job } from "../types";
 
 // Engine-found figures the user confirms (locked decision: engine enumerates, user confirms).
@@ -15,14 +16,40 @@ const stageLabel: Record<string, string> = {
   machine_verify: "Machine verify", human_verify: "Human verify", stored: "Stored", failed: "Failed",
 };
 
+type UploadState =
+  | { kind: "idle" }
+  | { kind: "working"; step: string; filename: string }
+  | { kind: "done"; paper: UploadedPaper }
+  | { kind: "error"; message: string };
+
 export function Intake() {
   const [picked, setPicked] = useState<string[]>(["Figure 2"]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [upload, setUpload] = useState<UploadState>({ kind: "idle" });
+  const [dragOver, setDragOver] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     loadJobs().then(setJobs);
   }, []);
   const toggle = (l: string) =>
     setPicked((p) => (p.includes(l) ? p.filter((x) => x !== l) : [...p, l]));
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setUpload({ kind: "error", message: "Not a PDF — the only accepted input is a paper PDF." });
+      return;
+    }
+    try {
+      setUpload({ kind: "working", step: "fingerprinting", filename: file.name });
+      const paper = await uploadPaper(file); // fingerprints, then uploads if Supabase is configured
+      setUpload({ kind: "done", paper });
+      loadJobs().then(setJobs); // refresh the queue
+    } catch (e) {
+      setUpload({ kind: "error", message: e instanceof Error ? e.message : "Upload failed." });
+    }
+  }
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
@@ -31,14 +58,57 @@ export function Intake() {
       </SectionTitle>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <Card className="flex flex-col items-center justify-center gap-2 border-dashed py-12 text-center">
-          <div className="text-3xl">📄</div>
-          <div className="text-sm text-slate-300">Drop a paper PDF here</div>
-          <div className="text-xs text-slate-500">or click to browse · fingerprinted on upload</div>
-          <button className="mt-2 rounded-md bg-cyan-500/20 px-3 py-1.5 text-sm text-cyan-200 hover:bg-cyan-500/30">
-            Choose PDF
-          </button>
-        </Card>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+        >
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/pdf,.pdf"
+            aria-label="Choose a paper PDF to upload"
+            className="hidden"
+            onChange={(e) => handleFile(e.target.files?.[0])}
+          />
+          <Card className={cx(
+            "flex flex-col items-center justify-center gap-2 border-dashed py-12 text-center transition",
+            dragOver && "border-active-edge bg-active-soft",
+          )}>
+            {upload.kind === "working" ? (
+              <>
+                <span className="h-2 w-2 animate-pulse rounded-full bg-active" />
+                <div className="text-sm text-ink">{upload.step}…</div>
+                <div className="mono truncate text-xs text-ink-faint">{upload.filename}</div>
+              </>
+            ) : upload.kind === "done" ? (
+              <>
+                <Badge tone="green">fingerprinted</Badge>
+                <div className="mono truncate text-xs text-ink-dim">sha256 {upload.paper.fileSha256.slice(0, 16)}…</div>
+                <div className="truncate text-xs text-ink-faint">{upload.paper.filename}</div>
+                {!supabaseConfigured && (
+                  <div className="text-[11px] text-attention">mock mode — fingerprinted locally, not stored</div>
+                )}
+                <button type="button" onClick={() => fileInput.current?.click()}
+                  className="mt-1 rounded-md bg-surface-raised px-3 py-1.5 text-sm text-ink hover:bg-edge">
+                  Upload another
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-sm text-ink-dim">Drop a paper PDF here</div>
+                <div className="text-xs text-ink-faint">or click to browse · fingerprinted (SHA-256) on upload</div>
+                {upload.kind === "error" && (
+                  <div className="text-xs text-invalid" role="alert">{upload.message}</div>
+                )}
+                <button type="button" onClick={() => fileInput.current?.click()}
+                  className="mt-2 rounded-md bg-active-soft px-3 py-1.5 text-sm text-active hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-active">
+                  Choose PDF
+                </button>
+              </>
+            )}
+          </Card>
+        </div>
 
         <Card>
           <div className="mb-3 flex items-center justify-between">

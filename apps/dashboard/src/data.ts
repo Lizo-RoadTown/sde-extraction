@@ -5,6 +5,70 @@ import { supabase } from "./lib/supabase";
 import * as mock from "./mock";
 import type { FigureExtraction, Job } from "./types";
 
+// ---- PDF storage: fingerprint, upload, signed URL ----------------------------
+// The PDF is the provenance root: it is SHA-256 fingerprinted the moment it lands,
+// stored in the Supabase 'papers' bucket, and a row is written to `papers`.
+
+const PAPERS_BUCKET = "papers";
+
+/** SHA-256 of the exact file bytes — the fingerprint that anchors provenance. */
+export async function fingerprintFile(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export interface UploadedPaper {
+  paperId: string | null; // null in mock mode (Supabase not configured)
+  fileSha256: string;
+  storagePath: string;
+  filename: string;
+}
+
+/**
+ * Fingerprint + upload a PDF to the 'papers' bucket and upsert a `papers` row.
+ * In mock mode (no Supabase) it still fingerprints, so the UI is real locally.
+ * Idempotent on the fingerprint: re-uploading the same PDF returns the same path.
+ */
+export async function uploadPaper(file: File): Promise<UploadedPaper> {
+  const fileSha256 = await fingerprintFile(file);
+  const storagePath = `${fileSha256}.pdf`;
+
+  if (!supabase) {
+    return { paperId: null, fileSha256, storagePath, filename: file.name };
+  }
+
+  const { error: upErr } = await supabase.storage
+    .from(PAPERS_BUCKET)
+    .upload(storagePath, file, { contentType: "application/pdf", upsert: true });
+  if (upErr) throw new Error(`upload failed: ${upErr.message}`);
+
+  // Upsert the provenance row keyed on the fingerprint (unique).
+  const { data, error: rowErr } = await supabase
+    .from("papers")
+    .upsert(
+      { file_sha256: fileSha256, filename: file.name, storage_path: storagePath, status: "uploaded" },
+      { onConflict: "file_sha256" },
+    )
+    .select("id")
+    .single();
+  if (rowErr) throw new Error(`paper row failed: ${rowErr.message}`);
+
+  return { paperId: String(data.id), fileSha256, storagePath, filename: file.name };
+}
+
+/** A time-limited URL the PDF viewer can render. Null in mock mode or if unset. */
+export async function signedPdfUrl(storagePath: string, expiresInSec = 3600): Promise<string | null> {
+  if (!supabase || !storagePath) return null;
+  const { data, error } = await supabase.storage
+    .from(PAPERS_BUCKET)
+    .createSignedUrl(storagePath, expiresInSec);
+  if (error || !data) return null;
+  return data.signedUrl;
+}
+
 function rowToExtraction(row: Record<string, unknown>): FigureExtraction {
   const m = (row.model ?? {}) as Partial<FigureExtraction>;
   return {

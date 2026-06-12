@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, SectionTitle, Badge, SlotView, cx } from "../ui";
+import { SectionTitle, Badge, SlotView, cx } from "../ui";
+import { Card } from "../ui";
 import { loadEscalations } from "../data";
+import { PdfPane } from "./PdfPane";
+import { FigurePane } from "./FigurePane";
 import type { FigureExtraction, NamedSlot, Slot } from "../types";
+
+// The slot the verifier is focused on — drives the PDF pane's jump-to-source.
+type Focus = { page: number; quote: string } | null;
 
 // The verifier's judgment on one slot. "unjudged" is a real, distinct state —
 // per docs/UX_CONTRACT.md, judged-absent must never look like not-yet-reviewed.
@@ -10,23 +16,36 @@ type Judgment = "unjudged" | "present" | "absent";
 function SlotRow({
   row,
   judgment,
+  focused,
   onJudge,
+  onFocus,
 }: {
   row: NamedSlot;
   judgment: Judgment;
+  focused: boolean;
   onJudge: (j: "present" | "absent") => void;
+  onFocus: () => void;
 }) {
   const engineSays: Slot["status"] = row.slot.status;
+  const canFocus = row.slot.status === "present"; // present slots have a quote+page to jump to
   return (
     <div
       className={cx(
         "flex items-start justify-between gap-4 border-b border-edge/60 py-2 last:border-0",
         judgment === "unjudged" && "opacity-95", // subtle: still needs a decision
+        focused && "bg-active-soft/40",
       )}
     >
       <div className="flex items-start gap-3">
         <span className="mono mt-0.5 w-16 text-sm text-active">{row.symbol}</span>
-        <SlotView slot={row.slot} />
+        {canFocus ? (
+          <button type="button" onClick={onFocus} className="text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
+            title="show this quote in the PDF">
+            <SlotView slot={row.slot} />
+          </button>
+        ) : (
+          <SlotView slot={row.slot} />
+        )}
       </div>
       {/* present/absent control — the core interaction. The verifier confirms or overrides
           what the engine extracted; the chosen button lights with its semantic color. */}
@@ -97,6 +116,10 @@ function Detail({ ext }: { ext: FigureExtraction }) {
   // parent, so switching extractions remounts this fresh — no manual reset needed.)
   const [judgments, setJudgments] = useState<Record<number, "present" | "absent">>({});
 
+  // Which slot is focused in the PDF pane, and which row index it maps to.
+  const [focus, setFocus] = useState<Focus>(null);
+  const [focusIdx, setFocusIdx] = useState<number | null>(null);
+
   const judgedCount = Object.keys(judgments).length;
   const allJudged = judgedCount === rows.length;
 
@@ -110,17 +133,10 @@ function Detail({ ext }: { ext: FigureExtraction }) {
         <a href={ext.pdfUrl} className="rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
       </div>
 
-      {/* two panes: source + figure-compare. Stubs today — labeled as such per the UX contract
-          (a placeholder that announces itself beats a silent blank that reads as broken). */}
+      {/* two panes: source PDF (jumps to the focused slot's page) + figure-compare oracle */}
       <div className="grid grid-cols-2 gap-4">
-        <Card className="flex h-40 flex-col items-center justify-center border-dashed text-center text-xs text-ink-faint">
-          <span className="mb-1 rounded bg-surface-raised px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-dim">not built yet</span>
-          PDF viewer — jump-to-source highlight<br />(offset-anchored span)
-        </Card>
-        <Card className="flex h-40 flex-col items-center justify-center border-dashed text-center text-xs text-ink-faint">
-          <span className="mb-1 rounded bg-surface-raised px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-dim">not built yet</span>
-          Figure compare — paper vs. regenerated<br />the verification oracle
-        </Card>
+        <PdfPane pdfUrl={ext.pdfUrl} targetPage={focus?.page} quote={focus?.quote} />
+        <FigurePane ext={ext} />
       </div>
 
       <Card>
@@ -133,7 +149,14 @@ function Detail({ ext }: { ext: FigureExtraction }) {
             key={i}
             row={r}
             judgment={judgments[i] ?? "unjudged"}
+            focused={focusIdx === i}
             onJudge={(j) => setJudgments((prev) => ({ ...prev, [i]: j }))}
+            onFocus={() => {
+              if (r.slot.status === "present") {
+                setFocus({ page: r.slot.page, quote: r.slot.quote });
+                setFocusIdx(i);
+              }
+            }}
           />
         ))}
         <div className="mt-3 flex items-center justify-between rounded-md bg-surface-raised/60 px-3 py-2">
