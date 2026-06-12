@@ -1,0 +1,42 @@
+---
+title: SDE Extraction
+description: Rigorous documentation for automated extraction of stochastic-differential-equation epidemiological models from the literature into provable, present/absent structured models.
+template: splash
+hero:
+  tagline: Turning published epidemiological models into provable, machine-readable form — with every step observable and every value traced to its source.
+  actions:
+    - text: Start with the canon
+      link: /explanation/canon/
+      icon: right-arrow
+    - text: How to read this
+      link: /start/how-to-read/
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What this documents
+
+This is the reference record for a method that extracts **stochastic differential equation
+(SDE) epidemiological models** from academic papers into a **provable, structured form** —
+where every captured value is either present (transcribed verbatim from the paper, with its
+source) or explicitly absent, and every data hand-off is observable and provenance-tracked.
+
+It is written to a single standard: **rigour**. Nothing here is asserted that is not
+substantiated by the system itself. Where a capability is planned but not yet verified, the
+page says so plainly rather than describing something that does not yet exist.
+
+<CardGrid>
+  <Card title="Explanation" icon="open-book">
+    Why the method works the way it does — the canon, present/absent, provenance, observability.
+  </Card>
+  <Card title="Reference" icon="list-format">
+    Exact definitions — the extraction schema, the database, the pipeline, targeting modes.
+  </Card>
+  <Card title="How-to" icon="setting">
+    Task recipes — run the worker, apply migrations, add and verify a paper.
+  </Card>
+  <Card title="Decisions" icon="approve-check">
+    The load-bearing architectural choices, recorded at the moment they were made.
+  </Card>
+</CardGrid>
