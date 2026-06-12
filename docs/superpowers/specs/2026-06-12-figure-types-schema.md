@@ -1,22 +1,69 @@
-# Figure types — self-growing reference list, schema + match-or-add
+# Figure types — the extraction constraint (self-growing list) + schema
 
-*Design, Liz 2026-06-12. Figure types are not a hand-curated taxonomy — they are a
-**self-growing reference list in Supabase**, whose purpose is to be a stable **join key
-for agent-health and confidence metrics**. The list bootstraps from the data: the extractor
-classifies a figure, a script matches it to the list or adds a new type. Each figure is tied
-to its DOI and a captured figure image so groupings are auditable by looking at the real
-figures.*
+*Design, Liz 2026-06-12. The figure type is **the constraint that drives extraction**, AND a
+self-growing reference list in Supabase that is a stable **join key for agent-health and
+confidence metrics**. Each figure type carries a profile of **what had to be present to
+produce that figure** — the present/absent map. The list bootstraps from the data via
+match-or-add; each figure is tied to its DOI and a captured image so groupings stay
+auditable.*
 
-## Why this exists (not taxonomy — telemetry keys)
+## Why the figure is THE constraint (the load-bearing idea)
 
-Agent health (and therefore [confidence](2026-06-11-confidence-and-tagging is the pillar))
-is tracked **per figure type**: "the extractor is healthy on stationary-distribution figures
-but degrading on sensitivity sweeps." That sentence is only possible if figure types are
-**identified, stable, tied keys**. The list is the *dimension* the
+The figure is the only consistent, pinnable thing in a paper. Variables, parameters, what
+they *mean*, the model structure — all free-for-all, unpinnable in advance. But there is
+**always a figure, and the figure is an outcome that was produced** — so the paper *had to
+contain everything needed to produce it.*
+
+Therefore extraction is a **bounded BACKWARD search from the figure**, never forward
+simulation:
+
+> figure type → *what outcome was produced* → *what had to be present to produce it* → the
+> finite list of things to search the paper for, present/absent each.
+
+You never go forward (take variables, simulate, see what figure pops out, reverse-engineer
+which one you got — unbounded and absurd). The figure is the **known endpoint**; the figure
+type is the only anchor that **bounds and directs** the search. This **completes the
+[document-architecture canon](../../../Agent%20Drafts/sde-extraction-approach/2026-06-05-document-architecture-canon.md)**:
+the canon said "constrain the document"; the figure is *what* constrains it.
+
+So a figure type is not merely a label or a health key — it **carries the present/absent map**
+(the "required-to-produce" profile) that the agent searches against.
+
+## Slots are fixed; their meaning is the variable
+
+The slot *structure* is always the same — parameters, variables, initial conditions, drift,
+diffusion. What *varies*, and is the interesting part, is what each slot **represents** in a
+given paper (`β` is "a parameter" always, but transmission rate here, noise intensity there).
+The figure type bounds *which* slots had to exist to produce the outcome and drives finding
+*what they mean* in this paper.
+
+## Also: the telemetry key (unchanged)
+
+The figure type remains a stable join key for **agent-health / confidence** metrics: "the
+extractor is healthy on stationary-distribution figures but degrading on sensitivity sweeps"
+requires stable, identified figure-type ids — the dimension the
 [validation-points telemetry](2026-06-12-validation-points-map.md) buckets agent health by.
-So the list must be defined, stable-id'd, and maintained — it is a join key, not a
-description. (Figure type is already named as a confidence dimension in
-`apps/dashboard/src/surfaces/ExtractionHealth.tsx`.)
+(Both *model type* and *figure type* are confidence dimensions in
+`apps/dashboard/src/surfaces/ExtractionHealth.tsx`.) Same id serves both roles: it drives the
+extraction map AND buckets the health metrics.
+
+## The backward search the figure drives (the extraction sequence)
+
+Once a figure is classified, its type's `required_to_produce` profile drives a bounded,
+ordered search of the paper — working back from the produced outcome to the machinery that
+produced it. Each step is present/absent:
+
+```text
+THE FIGURE (a produced outcome)
+  → 1. the stochastic MODEL   (the structure: drift + diffusion/noise that produced it)
+  → 2. the PARAMETERS         (the constants the model uses)
+  → 3. the VARIABLES          (the compartments / state the model evolves)
+  → 4. the INITIAL CONDITIONS (the starting state the run began from)
+```
+
+Each item is searched-for against the source, present/absent each — never invented. This is
+finite and directed *because* the figure bounds it: the outcome could only have come from a
+model with these parts, so these are exactly the things to look for.
 
 ## The model (like a search index that grows itself)
 
@@ -37,12 +84,20 @@ flowchart TD
 ## Schema (Supabase, alongside the other metadata)
 
 ```sql
--- the growing list — each type a row with a STABLE id (the telemetry join key)
+-- the growing list — each type a row with a STABLE id (drives extraction AND keys telemetry)
 create table figure_types (
   id            uuid primary key default gen_random_uuid(),
   name          text not null unique,        -- normalized type name (the match key v1)
-  description   text,                         -- what this type shows
-  recognized_by text,                         -- visual/caption cues (notes for auditing)
+  description   text,                         -- what this type shows (the outcome)
+  recognized_by text,                         -- visual/caption cues (how to classify it)
+  -- THE EXTRACTION MAP: what had to be present to PRODUCE this figure type.
+  -- The agent searches the paper BACKWARD from the figure against this profile,
+  -- present/absent each. This is what makes the figure type the extraction constraint.
+  required_to_produce jsonb,                  -- e.g. {state_variables, parameters, drift,
+                                              --        diffusion/noise, initial_conditions,
+                                              --        time_span, ...} the outcome demands
+  is_result     boolean not null default true,-- false = non-results figure (schematic, ML
+                                              --   diagnostics) → the bulk picker excludes it
   status        text not null default 'active', -- active | merged | deprecated
   merged_into   uuid references figure_types(id), -- if this type was later merged
   created_at    timestamptz not null default now(),
