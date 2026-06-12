@@ -18,7 +18,7 @@ const NAV: { key: Surface; label: string; blurb: string }[] = [
 ];
 
 export default function App() {
-  const [surface, setSurface] = useState<Surface>("verify");
+  const [surface, setSurface] = useState<Surface>("intake");
 
   return (
     <AuthGate>
