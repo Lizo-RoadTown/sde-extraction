@@ -12,7 +12,7 @@ function mockConfidence(id: string): number {
 import { loadEscalations } from "../data";
 import { PdfPane } from "./PdfPane";
 import { FigurePane } from "./FigurePane";
-import type { FigureExtraction, NamedSlot, Slot } from "../types";
+import type { FigureExtraction, Slot } from "../types";
 
 // The slot the verifier is focused on — drives the PDF pane's jump-to-source.
 type Focus = { page: number; quote: string } | null;
@@ -28,7 +28,7 @@ function SlotRow({
   onJudge,
   onFocus,
 }: {
-  row: NamedSlot;
+  row: { label: string; slot: Slot };
   judgment: Judgment;
   focused: boolean;
   onJudge: (j: "present" | "absent") => void;
@@ -45,7 +45,7 @@ function SlotRow({
       )}
     >
       <div className="flex items-start gap-3">
-        <span className="mono mt-0.5 w-16 text-sm text-active">{row.symbol}</span>
+        <span className="mono mt-0.5 w-28 shrink-0 text-xs text-active">{row.label}</span>
         {canFocus ? (
           <button type="button" onClick={onFocus} className="text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
             title="show this quote in the PDF">
@@ -110,12 +110,24 @@ function SlotRow({
 }
 
 export function Detail({ ext }: { ext: FigureExtraction }) {
-  const rows: NamedSlot[] = useMemo(
+  // Flatten everything the FIGURE required into present/absent rows. Each variable and
+  // parameter contributes several slots (meaning, value/initial-condition, units) — every
+  // piece the figure needed, each judged present/absent against the source.
+  const rows: { label: string; slot: Slot }[] = useMemo(
     () => [
-      ...ext.stateVariables,
-      ...ext.parameters,
-      ...ext.driftTerms.map((d) => ({ symbol: `drift ${d.variable}`, slot: d.slot })),
-      ...ext.diffusionTerms.map((d) => ({ symbol: `diff ${d.variable}`, slot: d.slot })),
+      ...ext.variables.flatMap((v) => [
+        { label: `${v.symbol} · meaning`, slot: v.meaning },
+        { label: `${v.symbol} · initial value`, slot: v.initialValue },
+      ]),
+      ...ext.parameters.flatMap((p) => [
+        { label: `${p.symbol} · value`, slot: p.value },
+        { label: `${p.symbol} · meaning`, slot: p.meaning },
+        { label: `${p.symbol} · units`, slot: p.units },
+      ]),
+      ...ext.driftTerms.map((d) => ({ label: `drift ${d.variable}`, slot: d.expression })),
+      ...ext.diffusionTerms.map((d) => ({ label: `diff ${d.variable}`, slot: d.expression })),
+      { label: "time · initial", slot: ext.timeSpan.initialTime },
+      { label: "time · final", slot: ext.timeSpan.finalTime },
     ],
     [ext],
   );
@@ -133,10 +145,13 @@ export function Detail({ ext }: { ext: FigureExtraction }) {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
+      {/* the FIGURE — the anchor. It exists; it is not present/absent. Everything below it is. */}
       <div className="flex items-center justify-between">
-        <div>
-          <div className="text-sm font-medium text-ink">{ext.paperTitle}</div>
-          <div className="text-xs text-ink-faint">{ext.figureLabel} · {ext.pathogen} · {ext.doi}</div>
+        <div className="flex items-center gap-2">
+          <span className="display text-lg text-ink">{ext.figureLabel}</span>
+          {ext.figureType && <Badge tone="cyan">{ext.figureType}</Badge>}
+          {ext.outcome && <Badge tone={ext.outcome === "successful" ? "green" : "amber"}>{ext.outcome}</Badge>}
+          <span className="text-xs text-ink-faint">{ext.pathogen} · {ext.doi}</span>
         </div>
         <a href={ext.pdfUrl} className="rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
       </div>
@@ -168,9 +183,9 @@ export function Detail({ ext }: { ext: FigureExtraction }) {
             }}
           />
         ))}
-        <div className="mt-3 flex items-center justify-between rounded-md bg-surface-raised/60 px-3 py-2">
-          <span className="text-xs text-ink-dim">Figure binding — “which values made this figure?”</span>
-          <SlotView slot={ext.figureBinding} />
+        <div className="mt-3 rounded-md bg-surface-raised/60 px-3 py-2 text-xs text-ink-faint">
+          These are everything <span className="text-ink-dim">{ext.figureLabel}</span> required to be produced —
+          searched backward from the figure, each confirmed present or absent against the source.
         </div>
       </Card>
 
@@ -224,7 +239,7 @@ export function Verify() {
             <button type="button" key={e.id} onClick={() => setSelected(e.id)}
               className={cx("rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active", e.id === selected ? "border-active-edge bg-active-soft" : "border-edge bg-surface-raised/40 hover:bg-surface-raised/70")}>
               <div className="text-sm text-ink">{e.figureLabel}</div>
-              <div className="truncate text-xs text-ink-faint">{e.paperTitle}</div>
+              <div className="truncate text-xs text-ink-faint">{e.figureType || e.pathogen} · {e.doi}</div>
               <div className="mt-1 flex items-center gap-1.5">
                 <Badge tone="amber">needs human</Badge>
                 <ConfidenceChip score={mockConfidence(e.id)} />

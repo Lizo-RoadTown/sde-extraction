@@ -53,9 +53,9 @@ export function Library() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {library.map((m) => (
           <Card key={m.id} className="flex flex-col gap-2 hover:border-active-edge">
-            <div className="flex h-24 items-center justify-center rounded-md bg-inset/60 text-ink-faint">📈 figure</div>
-            <div className="text-sm font-medium text-ink">{m.paperTitle}</div>
-            <div className="text-xs text-ink-faint">{m.figureLabel} · {m.pathogen}</div>
+            <div className="flex h-24 items-center justify-center rounded-md bg-inset/60 text-ink-faint">figure</div>
+            <div className="text-sm font-medium text-ink">{m.figureLabel}{m.figureType ? ` · ${m.figureType}` : ""}</div>
+            <div className="text-xs text-ink-faint">{m.pathogen}</div>
             <div className="mt-1 flex items-center justify-between">
               <span className="mono text-[11px] text-ink-faint">{m.doi}</span>
               <div className="flex items-center gap-1.5">

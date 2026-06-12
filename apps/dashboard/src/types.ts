@@ -14,14 +14,29 @@ export type Slot =
     }
   | { status: "absent"; reason: AbsenceReason };
 
-export interface NamedSlot {
-  symbol: string;
-  slot: Slot;
+// The figure REQUIRES these — each carries its own present/absent slots + meaning.
+// (symbol/variable is the anchor; meaning + value/initial-condition are searched.)
+export interface Variable {
+  symbol: string; // the anchor, e.g. "S"
+  meaning: Slot; // what it represents (present/absent)
+  initialValue: Slot; // its initial condition
 }
 
-export interface EquationSlot {
-  variable: string;
-  slot: Slot;
+export interface Parameter {
+  symbol: string; // the anchor, e.g. "sigma"
+  value: Slot; // its numeric value
+  meaning: Slot; // what it represents
+  units: Slot; // its units, if stated
+}
+
+export interface Term {
+  variable: string; // which variable this change-term is for
+  expression: Slot; // verbatim RHS, present/absent
+}
+
+export interface TimeSpan {
+  initialTime: Slot;
+  finalTime: Slot;
 }
 
 export type ExtractionStatus =
@@ -32,21 +47,24 @@ export type ExtractionStatus =
   | "verified"
   | "failed";
 
-// One (paper, figure) pair — the unit of work.
+// One (paper, figure) extraction. The FIGURE is the anchor (NOT present/absent — it exists);
+// the machinery it required to be produced is each present/absent.
 export interface FigureExtraction {
   id: string;
-  paperTitle: string;
+  // --- the figure: the anchor ---
+  figureLabel: string;
+  figureType: string; // the classified outcome type (drives the backward search)
+  outcome: string; // "successful" | "failed" — could it be reproduced?
   pathogen: string;
   doi: string;
-  figureLabel: string;
   status: ExtractionStatus;
-  fileSha256: string;
   pdfUrl: string;
-  stateVariables: NamedSlot[];
-  parameters: NamedSlot[];
-  driftTerms: EquationSlot[];
-  diffusionTerms: EquationSlot[];
-  figureBinding: Slot; // "which values produced this figure?" — itself present/absent
+  // --- what the figure required: each present/absent, with meaning ---
+  variables: Variable[];
+  parameters: Parameter[];
+  driftTerms: Term[];
+  diffusionTerms: Term[];
+  timeSpan: TimeSpan;
   figureReproduced?: boolean | null; // the oracle: did captured values regenerate the figure?
 }
 

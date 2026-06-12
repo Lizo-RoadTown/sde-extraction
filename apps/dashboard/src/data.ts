@@ -71,21 +71,22 @@ export async function signedPdfUrl(storagePath: string, expiresInSec = 3600): Pr
 }
 
 function rowToExtraction(row: Record<string, unknown>): FigureExtraction {
-  const m = (row.model ?? {}) as Partial<FigureExtraction>;
+  const m = (row.model ?? {}) as Partial<FigureExtraction> & Record<string, unknown>;
+  const absent = { status: "absent", reason: "not_stated" } as const;
   return {
     id: String(row.id),
-    paperTitle: m.paperTitle ?? (row.title as string) ?? "",
+    figureLabel: (row.figure_label as string) ?? m.figureLabel ?? "",
+    figureType: (m.figureType as string) ?? "",
+    outcome: (m.outcome as string) ?? "",
     pathogen: (row.pathogen as string) ?? m.pathogen ?? "",
     doi: (row.doi as string) ?? m.doi ?? "",
-    figureLabel: (row.figure_label as string) ?? m.figureLabel ?? "",
     status: (row.status as FigureExtraction["status"]) ?? "needs_human",
-    fileSha256: (row.file_sha256 as string) ?? m.fileSha256 ?? "",
-    pdfUrl: m.pdfUrl ?? "#",
-    stateVariables: m.stateVariables ?? [],
+    pdfUrl: (m.pdfUrl as string) ?? "#",
+    variables: m.variables ?? [],
     parameters: m.parameters ?? [],
     driftTerms: m.driftTerms ?? [],
     diffusionTerms: m.diffusionTerms ?? [],
-    figureBinding: m.figureBinding ?? { status: "absent", reason: "not_stated" },
+    timeSpan: m.timeSpan ?? { initialTime: absent, finalTime: absent },
     figureReproduced: (row.figure_reproduced as boolean | null) ?? null,
   };
 }
