@@ -85,58 +85,79 @@ Slot = Union[Present, Absent]
 
 # ============================================================
 # LAYER 1 — EXTRACTION  (what the LLM returns)
-# [UNDER REVIEW] — which slots exist / how the document-map is shaped is not yet validated.
+#
+# The FIGURE is the ANCHOR — the produced outcome. It EXISTS; it is never present/absent.
+# Everything the figure REQUIRES to have been produced — the model (drift+diffusion), the
+# parameters, the variables, their initial conditions, the time span — is each PRESENT or
+# ABSENT against the source, carrying rich MEANING metadata. The figure bounds the search.
+# (Design: docs/superpowers/specs/2026-06-12-figure-anchored-schema.md)
 # ============================================================
 
 
-class StateVariable(BaseModel):
-    """A compartment the model tracks, plus its initial value.  [UNDER REVIEW]"""
+class Variable(BaseModel):
+    """A state variable the figure's model requires (e.g. 'S', 'I', 'x').
 
-    symbol: str                                       # e.g. "S" — part of the document-map
-    initial_value: Slot
+    `symbol` is the anchor (known from what the figure needs). What it MEANS and its INITIAL
+    CONDITION are searched for in the source — each present or absent.
+    """
+
+    symbol: str                                       # e.g. "S" — the anchor
+    meaning: Slot                                     # what it represents (susceptible cells, the OU log-process…)
+    initial_value: Slot                               # its initial condition (curation template: initial_values)
 
 
 class Parameter(BaseModel):
-    """A named constant, plus its value.  [UNDER REVIEW]"""
+    """A named constant the figure's model requires (e.g. 'mu', 'sigma', 'x_bar').
 
-    symbol: str                                       # e.g. "mu"
-    value: Slot
-
-
-class Equation(BaseModel):
-    """One drift or diffusion contribution for a single state variable.  [UNDER REVIEW]
-
-    `expression` is the verbatim right-hand side as written, or absent. How the math is
-    ultimately encoded is deliberately left open — we keep the paper's own text for now.
+    `value` and `meaning` are each searched for — present or absent. The Dengue OU review's
+    `x_bar` is the canonical absent: 'never stated explicitly' -> Absent(requires_inference).
     """
 
-    variable: str                                     # which state variable this change-term is for
-    expression: Slot
+    symbol: str                                       # e.g. "sigma" — the anchor
+    value: Slot                                       # its numeric value (curation template: parameter_values)
+    meaning: Slot                                     # what it represents (noise intensity, transmission rate…)
+    units: Slot                                       # its units, if stated
 
 
-class FigureBinding(BaseModel):
-    """'Which values produced this figure?' — itself present or absent (often a no).  [UNDER REVIEW]"""
+class Term(BaseModel):
+    """One drift or diffusion contribution for a single variable — the stochastic MODEL itself.
 
-    uses_values: Slot
+    `expression` is the verbatim right-hand side as written, or absent. The drift terms are the
+    deterministic skeleton; the diffusion terms are the noise that makes it stochastic.
+    """
+
+    variable: str                                     # which variable this change-term is for
+    expression: Slot                                  # the verbatim RHS, present or absent
+
+
+class TimeSpan(BaseModel):
+    """The simulation window the figure was produced over (curation template: initial/final_time)."""
+
+    initial_time: Slot
+    final_time: Slot
 
 
 class FigureExtraction(BaseModel):
-    """One (paper, figure) extraction — the unit of work and the OpenAI response_format.  [UNDER REVIEW]
+    """One (paper, figure) extraction — the unit of work and the OpenAI response_format.
 
-    NOTE (canon, UNDER REVIEW): this captures the terms of the final model. The canon also calls for
-    nodes representing the document's TRANSFORMATION STEPS (deterministic -> stochastic), with a
-    present/absent decision at each step. That transformation-step node is NOT yet modeled here — it is
-    the main open piece between this schema and the full canon.
+    The figure is the ANCHOR (its fields below are NOT Slots — the figure exists). The MODEL it
+    required (drift+diffusion), the PARAMETERS, the VARIABLES (+initial conditions), and the TIME
+    SPAN are each present/absent. Per-figure-type specialization (which lists are mandatory) is
+    driven by figure_types.required_to_produce; v1 uses this one shape + a profile-guided prompt.
     """
 
-    paper_title: Slot
-    pathogen: Slot
-    figure_label: str
-    state_variables: list[StateVariable]
-    parameters: list[Parameter]
-    drift_terms: list[Equation]
-    diffusion_terms: list[Equation]
-    figure_binding: FigureBinding
+    # --- the FIGURE: the anchor. NOT present/absent — it is the produced outcome. ---
+    figure_label: str                                 # 'Figure 2' — which figure
+    figure_type: str                                  # the classified outcome type (drives the search)
+    outcome: str                                      # 'successful' | 'failed' (could it be reproduced?)
+    pathogen: str                                     # context
+
+    # --- what the figure REQUIRED to be produced: each present/absent, with meaning ---
+    variables: list[Variable]                         # the compartments/state (+ meaning + initial condition)
+    parameters: list[Parameter]                       # the constants (+ value + meaning + units)
+    drift_terms: list[Term]                           # the deterministic part of the model
+    diffusion_terms: list[Term]                       # the stochastic/noise part of the model
+    time_span: TimeSpan                               # the simulation window
 
 
 # ============================================================
@@ -202,10 +223,15 @@ def checksums_for(model: FigureExtraction) -> dict[str, str]:
 
     for i, p in enumerate(model.parameters):
         hash_slot(f"parameters[{i}].value", p.value)
-    for i, v in enumerate(model.state_variables):
-        hash_slot(f"state_variables[{i}].initial_value", v.initial_value)
+        hash_slot(f"parameters[{i}].meaning", p.meaning)
+        hash_slot(f"parameters[{i}].units", p.units)
+    for i, v in enumerate(model.variables):
+        hash_slot(f"variables[{i}].initial_value", v.initial_value)
+        hash_slot(f"variables[{i}].meaning", v.meaning)
     for i, e in enumerate(model.drift_terms):
         hash_slot(f"drift_terms[{i}].expression", e.expression)
     for i, e in enumerate(model.diffusion_terms):
         hash_slot(f"diffusion_terms[{i}].expression", e.expression)
+    hash_slot("time_span.initial_time", model.time_span.initial_time)
+    hash_slot("time_span.final_time", model.time_span.final_time)
     return proofs

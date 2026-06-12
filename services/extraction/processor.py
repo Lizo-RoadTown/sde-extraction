@@ -58,16 +58,19 @@ def _download(url: str) -> str:
 
 
 def _stub_extraction(figure_label: str) -> dict[str, Any]:
-    """A minimal valid present/absent result for --dry-run (no OpenAI call)."""
+    """A minimal valid result for --dry-run (no OpenAI call). The figure is the anchor
+    (plain fields); the required machinery lists are empty (nothing searched in dry-run)."""
+    absent = {"status": "absent", "reason": "not_stated"}
     return {
-        "paper_title": {"status": "absent", "reason": "not_stated"},
-        "pathogen": {"status": "absent", "reason": "not_stated"},
         "figure_label": figure_label,
-        "state_variables": [],
+        "figure_type": "(dry-run)",
+        "outcome": "failed",
+        "pathogen": "",
+        "variables": [],
         "parameters": [],
         "drift_terms": [],
         "diffusion_terms": [],
-        "figure_binding": {"status": "absent", "reason": "not_stated"},
+        "time_span": {"initial_time": absent, "final_time": absent},
         "_dry_run": True,
     }
 
