@@ -26,6 +26,9 @@ env/
 .ruff_cache/
 *.egg-info/
 
+# Astro build cache (genuine throwaway)
+**/.astro/
+
 # Node
 node_modules/
 dist/

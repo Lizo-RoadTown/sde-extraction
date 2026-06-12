@@ -4,6 +4,8 @@
 // the deployed site by requiring login first.)
 
 import { supabase } from "./lib/supabase";
+import { isPreview } from "./usePreview";
+import { SAMPLE_ESCALATIONS } from "./preview";
 import type { FigureExtraction, Job } from "./types";
 
 // ---- PDF storage: fingerprint, upload, signed URL ----------------------------
@@ -129,6 +131,16 @@ export interface WorkItem {
 }
 
 export async function loadWorkItems(): Promise<WorkItem[]> {
+  if (isPreview()) {
+    return SAMPLE_ESCALATIONS.map((e) => ({
+      key: `ext-${e.id}`,
+      paperTitle: `${e.pathogen} · ${e.doi}`,
+      figureLabel: e.figureLabel,
+      status: "needs_review" as const,
+      extractionId: e.id,
+      updatedAt: "preview",
+    }));
+  }
   if (!supabase) return [];
   const items: WorkItem[] = [];
 
@@ -172,6 +184,7 @@ export async function loadWorkItems(): Promise<WorkItem[]> {
 }
 
 export async function loadEscalations(): Promise<FigureExtraction[]> {
+  if (isPreview()) return SAMPLE_ESCALATIONS; // explicit preview mode → labeled sample data
   if (!supabase) return [];
   const { data, error } = await supabase.from("extractions").select("*").eq("status", "needs_human");
   if (error) { console.error("loadEscalations:", error.message); return []; }
@@ -179,6 +192,7 @@ export async function loadEscalations(): Promise<FigureExtraction[]> {
 }
 
 export async function loadExtraction(id: string): Promise<FigureExtraction | null> {
+  if (isPreview()) return SAMPLE_ESCALATIONS.find((e) => e.id === id) ?? null;
   if (!supabase) return null;
   const { data, error } = await supabase.from("extractions").select("*").eq("id", id).single();
   if (error || !data) { if (error) console.error("loadExtraction:", error.message); return null; }

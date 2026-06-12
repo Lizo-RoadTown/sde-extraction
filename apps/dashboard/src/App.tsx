@@ -4,6 +4,7 @@ import { Library } from "./surfaces/Library";
 import { ExtractionHealth } from "./surfaces/ExtractionHealth";
 import { cx } from "./ui";
 import { AuthGate } from "./auth";
+import { usePreview, setPreview } from "./usePreview";
 
 // Organized by the real work motion: add a paper + verify it (one surface),
 // browse the verified archive, and the engine's telemetry/confidence.
@@ -17,9 +18,15 @@ const NAV: { key: Surface; label: string; blurb: string }[] = [
 
 export default function App() {
   const [surface, setSurface] = useState<Surface>("papers");
+  const preview = usePreview();
 
   return (
     <AuthGate>
+    {preview && (
+      <div className="bg-attention-soft py-1 text-center text-[11px] text-attention">
+        PREVIEW MODE — showing labeled sample data (not real extractions). Toggle off in the header.
+      </div>
+    )}
     <div className="flex min-h-screen">
       {/* sidebar nav */}
       <aside className="flex w-56 flex-col border-r border-edge bg-inset/60 p-3">
@@ -55,6 +62,7 @@ export default function App() {
             {NAV.find((n) => n.key === surface)?.label}
           </div>
           <div className="flex items-center gap-3 text-xs text-ink-dim">
+            <PreviewToggle />
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 animate-pulse rounded-full bg-present" />
               engine + loom: live
@@ -70,5 +78,23 @@ export default function App() {
       </div>
     </div>
     </AuthGate>
+  );
+}
+
+// Dev-only toggle to view labeled sample data in an empty system.
+function PreviewToggle() {
+  const preview = usePreview();
+  return (
+    <button
+      type="button"
+      onClick={() => setPreview(!preview)}
+      title="Show labeled sample data so the filled UI is visible before real extractions run"
+      className={cx(
+        "rounded-full px-2 py-1 text-[11px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active",
+        preview ? "bg-attention-soft text-attention" : "bg-surface-raised text-ink-faint hover:text-ink",
+      )}
+    >
+      preview {preview ? "on" : "off"}
+    </button>
   );
 }
