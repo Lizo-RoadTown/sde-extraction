@@ -22,13 +22,15 @@ export function SectionTitle({ children, hint }: { children: ReactNode; hint?: s
   );
 }
 
+// Tones map to the six semantic roles in index.css / docs/UX_CONTRACT.md.
+// The legacy color keys are kept as aliases so existing callers don't change.
 const badgeTones: Record<string, string> = {
-  slate: "bg-slate-700/50 text-slate-300 border-slate-600/50",
-  green: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  amber: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  red: "bg-red-500/15 text-red-300 border-red-500/30",
-  cyan: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
-  violet: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+  slate: "bg-absent-soft text-absent border-edge",
+  green: "bg-present-soft text-present border-present-edge",
+  amber: "bg-attention-soft text-attention border-attention-edge",
+  red: "bg-invalid-soft text-invalid border-invalid-edge",
+  cyan: "bg-active-soft text-active border-active-edge",
+  violet: "bg-lineage-soft text-lineage border-lineage-soft",
 };
 
 export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: keyof typeof badgeTones }) {
@@ -40,12 +42,12 @@ export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?
 }
 
 const statTone: Record<string, string> = {
-  slate: "text-slate-100",
-  green: "text-emerald-300",
-  amber: "text-amber-300",
-  red: "text-red-300",
-  cyan: "text-cyan-300",
-  violet: "text-violet-300",
+  slate: "text-ink",
+  green: "text-present",
+  amber: "text-attention",
+  red: "text-invalid",
+  cyan: "text-active",
+  violet: "text-lineage",
 };
 
 export function StatCard({ label, value, tone = "slate" }: { label: string; value: ReactNode; tone?: keyof typeof statTone }) {

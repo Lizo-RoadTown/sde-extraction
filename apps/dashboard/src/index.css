@@ -1,11 +1,61 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Design tokens — the single place color/meaning lives.
+   Six semantic roles, one meaning each (per docs/UX_CONTRACT.md).
+   These mirror the colors already used across the app, so adopting
+   them changes nothing visually — it just makes color mean something.
+
+   Tailwind v4: anything under @theme becomes a utility, e.g.
+   --color-present-* -> bg-present-soft, text-present, border-present.
+   ============================================================ */
+@theme {
+  /* Surfaces (dark) */
+  --color-surface: #0f172a;       /* page background (slate-900) */
+  --color-surface-raised: #1e293b; /* cards/panels (slate-800) */
+  --color-edge: #1e293b;          /* borders/dividers (slate-800) */
+
+  /* Text hierarchy */
+  --color-ink: #e2e8f0;           /* primary text (slate-200) */
+  --color-ink-dim: #94a3b8;       /* secondary text (slate-400) */
+  --color-ink-faint: #64748b;     /* meta text (slate-500) */
+
+  /* --- The six UX-contract semantics, one meaning each --- */
+  /* present / correct / live — a stated value, verified */
+  --color-present: #6ee7b7;        /* emerald-300 (text) */
+  --color-present-soft: #10b98126; /* emerald-500/15 (fill) */
+  --color-present-edge: #10b9814d; /* emerald-500/30 (border) */
+
+  /* absent / not-stated — the canon's first-class "no" */
+  --color-absent: #cbd5e1;         /* slate-300 (text) */
+  --color-absent-soft: #33415580;  /* slate-700/50 (fill) */
+
+  /* candidate / suboptimal — selected-but-unjudged, or amber warning */
+  --color-attention: #fcd34d;      /* amber-300 (text) */
+  --color-attention-soft: #f59e0b26; /* amber-500/15 (fill) */
+  --color-attention-edge: #f59e0b4d; /* amber-500/30 (border) */
+
+  /* active / pivot — the current selection / focus accent */
+  --color-active: #67e8f9;         /* cyan-300 (text) */
+  --color-active-soft: #06b6d426;  /* cyan-500/15 (fill) */
+  --color-active-edge: #06b6d480;  /* cyan-500/50 (border) */
+
+  /* invalid — hard constraint violation (red flash / block) */
+  --color-invalid: #fca5a5;        /* red-300 (text) */
+  --color-invalid-soft: #ef444426; /* red-500/15 (fill) */
+  --color-invalid-edge: #ef44444d; /* red-500/30 (border) */
+
+  /* extra accent (lineage / provenance highlights) */
+  --color-lineage: #c4b5fd;        /* violet-300 (text) */
+  --color-lineage-soft: #8b5cf626; /* violet-500/15 (fill) */
+}
+
 :root { color-scheme: dark; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--color-surface);
+  color: var(--color-ink);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 * { box-sizing: border-box; }
