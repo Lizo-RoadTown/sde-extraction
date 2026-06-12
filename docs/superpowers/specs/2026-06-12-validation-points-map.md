@@ -124,6 +124,24 @@ Per validation point, over a window, capture:
 - **Latency** — time the check takes (a slow point is a bottleneck or a degrading dependency).
 - **Backlog** — items waiting before this point (esp. before the human gate V8).
 
+### 1b. Most gates are validation SCRIPTS — and that's good (Liz, 2026-06-12)
+
+A machine gate is usually a **deterministic validation script**, not an agent: does the hash match?
+is the licence on the allow-list? does the output conform to the schema? does the quote re-hash? These
+have a fixed pass/fail and **no judgment** — which makes them *more* trustworthy than agent calls, not
+less. A point validated only by a script is a perfectly good validation point.
+
+The one requirement (Liz): **we must be able to monitor it.** A silently-broken script that passes bad
+data is the failure mode to prevent. So every validation script gets a **runtime monitor**:
+- **Up / running** — did the check actually execute (vs. silently skipped / erroring)?
+- **Pass-rate** — its outcome distribution over time (a deterministic check whose pass-rate suddenly
+  shifts means its *input* changed — an early warning).
+- **Error / exception rate** — the script itself failing (vs. returning a clean fail).
+- **Latency** — slowdown signals a degrading dependency.
+
+So the three health subjects at a point are: the **script** (runtime monitor, above), the **point**
+overall (throughput / fail / backlog), and — only where one operates — an **agent**.
+
 ### 2. Agent health — when an agent acts at a point, is that agent healthy?
 Some points are operated by an agent (the extractor at V5; any future auto-classifier at intake; the
 machine-verifier across V3–V7). For each such agent, at each point it operates:
