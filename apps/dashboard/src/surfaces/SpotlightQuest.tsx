@@ -18,9 +18,9 @@ import type { FigureExtraction } from "../types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 
-const WIDTH = 620;
-const R = 150;       // lens radius (px) — soft falloff out to here
-const CORE = 88;     // sharp/bright core before the feather begins
+const WIDTH = 560;
+const R = 78;        // lens radius (px) — small, so it hones in (was half the page)
+const CORE = 38;     // sharp/bright core before the feather begins
 type Pt = { x: number; y: number };
 interface Find { human: string; value: string; quote: string; page: number }
 

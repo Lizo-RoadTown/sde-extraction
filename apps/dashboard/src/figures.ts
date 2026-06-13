@@ -11,6 +11,7 @@ export interface DetectedFigure {
   label: string;   // normalized, e.g. "Figure 2" / "Figure 3a"
   caption: string; // the text following the label (best-effort — the longest occurrence)
   page: number;
+  thumb?: string;  // a rendered image of the figure's page (data URL) — the ACTUAL figure, not words
 }
 
 export async function detectFigures(file: File): Promise<DetectedFigure[]> {
@@ -41,7 +42,31 @@ export async function detectFigures(file: File): Promise<DetectedFigure[]> {
       }
     }
   }
-  return Array.from(found.values()).sort((a, b) =>
+  const figs = Array.from(found.values()).sort((a, b) =>
     a.label.localeCompare(b.label, undefined, { numeric: true }),
   );
+
+  // Render each figure's page as a thumbnail (the ACTUAL figure, in page context — not just
+  // its caption). Deterministic via pdf.js; one render per page, shared across same-page figures.
+  const thumbByPage = new Map<number, string>();
+  for (const f of figs) {
+    if (!thumbByPage.has(f.page)) {
+      try {
+        const pg = await pdf.getPage(f.page);
+        const base = pg.getViewport({ scale: 1 });
+        const scale = Math.min(300 / base.width, 1.5);
+        const vp = pg.getViewport({ scale });
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.ceil(vp.width);
+        canvas.height = Math.ceil(vp.height);
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          await pg.render({ canvas, canvasContext: ctx, viewport: vp }).promise;
+          thumbByPage.set(f.page, canvas.toDataURL("image/png"));
+        }
+      } catch { /* no thumb for this page */ }
+    }
+    f.thumb = thumbByPage.get(f.page);
+  }
+  return figs;
 }

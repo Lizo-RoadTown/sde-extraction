@@ -182,13 +182,16 @@ export function SingleRun() {
                 ) : (
                   figures.map((f) => (
                     <button type="button" key={f.label} onClick={() => setChosen(f.label)}
-                      className={cx("rounded-md border px-3 py-2 text-left transition",
+                      className={cx("flex gap-3 rounded-md border px-3 py-2 text-left transition",
                         chosen === f.label ? "border-active-edge bg-active-soft" : "border-edge bg-surface-raised/40 hover:border-active-edge")}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-ink">{f.label}</span>
-                        <Badge tone="slate">p.{f.page}</Badge>
+                      {f.thumb && <img src={f.thumb} alt={f.label} className="h-20 w-16 shrink-0 rounded border border-edge bg-white object-cover object-top" />}
+                      <div className="min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-ink">{f.label}</span>
+                          <Badge tone="slate">p.{f.page}</Badge>
+                        </div>
+                        {f.caption && <div className="mt-0.5 line-clamp-3 text-[11px] text-ink-faint">{f.caption}</div>}
                       </div>
-                      {f.caption && <div className="mt-0.5 line-clamp-2 text-[11px] text-ink-faint">{f.caption}</div>}
                     </button>
                   ))
                 )}
