@@ -6,12 +6,13 @@ import {
 } from "../data";
 import { supabaseConfigured } from "../lib/supabase";
 import { Link } from "../router";
+import { detectFigures, type DetectedFigure } from "../figures";
 import type { FigureExtraction } from "../types";
 import { Detail } from "./Verify";
 
-// Page 1 — a single paper, end to end, without ever leaving: upload → choose what to
-// extract → run → watch progress → verify the result inline. For one paper you do the
-// whole motion here. Batches go through the Queue page instead (its own URL).
+// Page 1 — the guided Walkthrough. FIGURES FIRST: the moment a paper is uploaded, a script
+// scans it and displays every figure; you choose one (or ask the agent to auto-detect), and
+// only then does extraction run — with the spotlight search + verify, inline on this page.
 
 type UploadState =
   | { kind: "idle" }
@@ -19,15 +20,8 @@ type UploadState =
   | { kind: "done"; paper: UploadedPaper }
   | { kind: "error"; message: string };
 
-type TargetMode = "auto" | "figure" | "model" | "whole";
-const TARGET_MODES: { key: TargetMode; label: string; blurb: string }[] = [
-  { key: "auto", label: "Auto-detect", blurb: "engine finds the model · you verify" },
-  { key: "figure", label: "By figure", blurb: "you name the figure to target" },
-  { key: "model", label: "By model", blurb: "you describe the model to find" },
-  { key: "whole", label: "Whole paper", blurb: "extract everything the engine finds" },
-];
+const AUTO = "__auto__"; // the command: let the agent choose the figure
 
-// The single run's lifecycle once the user presses Extract.
 type RunPhase =
   | { kind: "compose" }
   | { kind: "running"; jobId: string; paperId: string; stage: string }
@@ -45,10 +39,12 @@ export function SingleRun() {
   const [upload, setUpload] = useState<UploadState>({ kind: "idle" });
   const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<TargetMode>("auto");
-  const [figureRef, setFigureRef] = useState("");
-  const [modelDesc, setModelDesc] = useState("");
   const [phase, setPhase] = useState<RunPhase>({ kind: "compose" });
+
+  // Stage 1 — figures detected on upload, displayed for the user to choose from.
+  const [figures, setFigures] = useState<DetectedFigure[]>([]);
+  const [detecting, setDetecting] = useState(false);
+  const [chosen, setChosen] = useState<string | null>(null); // a figure label, or AUTO
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -60,6 +56,10 @@ export function SingleRun() {
       setUpload({ kind: "working", step: "fingerprinting", filename: file.name });
       const paper = await uploadPaper(file);
       setUpload({ kind: "done", paper });
+      // Stage 1: detect + display the figures (deterministic, no LLM) so the user can choose.
+      setDetecting(true); setFigures([]); setChosen(null);
+      try { setFigures(await detectFigures(file)); } catch { /* leave empty → auto */ }
+      finally { setDetecting(false); }
     } catch (e) {
       setUpload({ kind: "error", message: e instanceof Error ? e.message : "Upload failed." });
     }
@@ -68,12 +68,12 @@ export function SingleRun() {
   const paperId = upload.kind === "done" ? upload.paper.paperId : null;
 
   async function startExtraction() {
-    if (!paperId) return;
-    const target: JobTarget =
-      mode === "figure" ? { mode, figure_ref: figureRef, lane: "walkthrough" }
-      : mode === "model" ? { mode, model_desc: modelDesc, lane: "walkthrough" }
-      : { mode, lane: "walkthrough" };
-    const label = mode === "figure" ? (figureRef || "(figure)") : mode === "auto" ? "(auto)" : `(${mode})`;
+    if (!paperId || !chosen) return;
+    const auto = chosen === AUTO;
+    const target: JobTarget = auto
+      ? { mode: "auto", lane: "walkthrough" }
+      : { mode: "figure", figure_ref: chosen, lane: "walkthrough" };
+    const label = auto ? "(auto)" : chosen;
     const jobId = await enqueueJob(paperId, label, target);
     if (!jobId) { setPhase({ kind: "failed", message: "Couldn't queue the job — are you signed in?" }); return; }
     setPhase({ kind: "running", jobId, paperId, stage: "queued" });
@@ -82,11 +82,9 @@ export function SingleRun() {
   function reset() {
     setPhase({ kind: "compose" });
     setUpload({ kind: "idle" });
+    setFigures([]); setChosen(null);
   }
 
-  // Poll the job while it runs. A real extraction is worker-poll (≤30s) + the OpenAI call,
-  // so this can take up to ~a minute; we surface the stage as it advances and flip to the
-  // inline verifier the moment the worker stores the result.
   const runningJobId = phase.kind === "running" ? phase.jobId : null;
   useEffect(() => {
     if (phase.kind !== "running") return;
@@ -95,10 +93,7 @@ export function SingleRun() {
     const tick = async () => {
       const s = await loadJobStage(jobId);
       if (cancelled || !s) return;
-      if (s.stage === "failed") {
-        setPhase({ kind: "failed", message: s.error || "The extraction job failed." });
-        return;
-      }
+      if (s.stage === "failed") { setPhase({ kind: "failed", message: s.error || "The extraction job failed." }); return; }
       if (s.stage === "stored") {
         const ext = await loadLatestExtraction(paperId);
         if (cancelled) return;
@@ -115,21 +110,20 @@ export function SingleRun() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <SectionTitle hint="Walk the whole process: add a paper, watch the engine search the page for what the figure needed, and verify the result — with the proof in view. New here or want to see how it works? Start here. Doing many at once? Use Bulk.">
+      <SectionTitle hint="Walk the whole process: add a paper, choose which figure to reproduce, watch the engine search the page for what it needed, and verify — with the proof in view. New here or want to see how it works? Start here. Doing many at once? Use Bulk.">
         Walkthrough
       </SectionTitle>
 
-      {/* compose — upload + targeting. Disabled while a run is in flight. */}
       <fieldset disabled={phase.kind === "running"} className={cx(phase.kind === "running" && "opacity-60")}>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* upload */}
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
           >
-            <input ref={fileInput} type="file" accept="application/pdf,.pdf"
-              aria-label="Choose a paper PDF to upload" className="hidden"
-              onChange={(e) => handleFile(e.target.files?.[0])} />
+            <input ref={fileInput} type="file" accept="application/pdf,.pdf" aria-label="Choose a paper PDF to upload"
+              className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
             <Card className={cx(
               "flex h-full flex-col items-center justify-center gap-2 border-dashed py-10 text-center transition",
               dragOver && "border-active-edge bg-active-soft",
@@ -161,44 +155,54 @@ export function SingleRun() {
             </Card>
           </div>
 
-          <Card>
-            <div className="mb-3 text-sm font-medium text-ink">What should the engine extract?</div>
-            <div className="mb-1 flex gap-1 rounded-lg bg-inset p-1">
-              {TARGET_MODES.map((m) => (
-                <button type="button" key={m.key} onClick={() => setMode(m.key)}
-                  className={cx("flex-1 rounded-md px-2 py-1.5 text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active",
-                    mode === m.key ? "bg-active-soft text-active" : "text-ink-dim hover:text-ink")}>
-                  {m.label}
+          {/* Stage 1 — figures first: choose which one to reproduce */}
+          <Card className="flex flex-col">
+            <div className="mb-2 text-sm font-medium text-ink">Which figure do you want to reproduce?</div>
+            {upload.kind !== "done" ? (
+              <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-edge py-8 text-center text-xs text-ink-faint">
+                Upload a paper — its figures appear here to choose from.
+              </div>
+            ) : detecting ? (
+              <div className="flex flex-1 items-center justify-center gap-2 py-8 text-xs text-ink-faint">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-active" /> finding figures…
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {/* auto-detect — the command to let the agent choose */}
+                <button type="button" onClick={() => setChosen(AUTO)}
+                  className={cx("rounded-md border px-3 py-2 text-left text-sm transition",
+                    chosen === AUTO ? "border-active-edge bg-active-soft text-active" : "border-edge bg-surface-raised/40 text-ink-dim hover:text-ink")}>
+                  <div className="font-medium">Auto-detect</div>
+                  <div className="text-[11px] text-ink-faint">let the agent choose the figure to extract</div>
                 </button>
-              ))}
-            </div>
-            <div className="mb-3 text-[11px] text-ink-faint">{TARGET_MODES.find((m) => m.key === mode)!.blurb}</div>
-
-            {mode === "figure" && (
-              <input value={figureRef} onChange={(e) => setFigureRef(e.target.value)} placeholder="e.g. Figure 2, or p.12"
-                className="w-full rounded-md border border-edge bg-surface-raised/40 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus-visible:outline focus-visible:outline-2 focus-visible:outline-active" />
-            )}
-            {mode === "model" && (
-              <textarea value={modelDesc} onChange={(e) => setModelDesc(e.target.value)} rows={2}
-                placeholder="describe the model — e.g. 'the stochastic SIR with Ornstein–Uhlenbeck noise'"
-                className="w-full rounded-md border border-edge bg-surface-raised/40 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus-visible:outline focus-visible:outline-2 focus-visible:outline-active" />
-            )}
-            {(mode === "auto" || mode === "whole") && (
-              <div className="rounded-md border border-dashed border-edge px-3 py-3 text-center text-xs text-ink-faint">
-                {mode === "auto" ? "The engine detects the model and you verify it." : "The engine extracts every model it finds."}
+                {figures.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-edge px-3 py-3 text-center text-[11px] text-ink-faint">
+                    No figure captions detected in the text — use Auto-detect.
+                  </div>
+                ) : (
+                  figures.map((f) => (
+                    <button type="button" key={f.label} onClick={() => setChosen(f.label)}
+                      className={cx("rounded-md border px-3 py-2 text-left transition",
+                        chosen === f.label ? "border-active-edge bg-active-soft" : "border-edge bg-surface-raised/40 hover:border-active-edge")}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-ink">{f.label}</span>
+                        <Badge tone="slate">p.{f.page}</Badge>
+                      </div>
+                      {f.caption && <div className="mt-0.5 line-clamp-2 text-[11px] text-ink-faint">{f.caption}</div>}
+                    </button>
+                  ))
+                )}
+                <button type="button" onClick={startExtraction} disabled={!paperId || !chosen}
+                  title={!chosen ? "Choose a figure or Auto-detect" : undefined}
+                  className="mt-2 w-full rounded-md bg-active-soft py-2 text-sm text-active transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                  Extract {chosen && chosen !== AUTO ? chosen : ""} →
+                </button>
               </div>
             )}
-
-            <button type="button" onClick={startExtraction} disabled={!paperId}
-              title={paperId ? undefined : "Upload a paper first"}
-              className="mt-3 w-full rounded-md bg-active-soft py-2 text-sm text-active transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-              Extract →
-            </button>
           </Card>
         </div>
       </fieldset>
 
-      {/* the run — progress, then the verifier inline, or an error */}
       {phase.kind === "running" && (
         <Card className="flex flex-col items-center gap-2 py-8 text-center">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-active" />
@@ -215,8 +219,7 @@ export function SingleRun() {
         <Card className="flex flex-col items-center gap-3 py-8 text-center">
           <Badge tone="red">failed</Badge>
           <div className="text-sm text-ink-dim">{phase.message}</div>
-          <button type="button" onClick={reset}
-            className="rounded-md bg-surface-raised px-3 py-1.5 text-sm text-ink hover:bg-edge">start over</button>
+          <button type="button" onClick={reset} className="rounded-md bg-surface-raised px-3 py-1.5 text-sm text-ink hover:bg-edge">start over</button>
         </Card>
       )}
 
