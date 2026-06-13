@@ -8,6 +8,29 @@
 2026-06-12-figure-anchored-schema.md (the schema). This proposal is the WORKFLOW layer that
 wires those together. Reconcile with the pending proves+deepagents background research when it lands.
 
+## Canonical specs (the complete, authoritative list)
+
+Numbered so nothing gets dropped in restatement again. All are Liz's design.
+
+1. **Domain:** extract SDE epidemiological models from academic PDFs.
+2. **Figure-anchored / backward search:** figure (the anchor, a produced outcome) → model (drift+diffusion) → parameters → variables → initial conditions.
+3. **Figures-first:** detect + display ALL figures; user picks one **or** auto; the chosen figure's **panels = the variable checklist**.
+4. **Present/absent canon:** every slot present (verbatim quote + page) or absent (not_stated | requires_inference). Never hallucinate; absence is valid.
+5. **ORCHESTRATOR** (named): a single coordinator runs the stages in a fixed, explicit order — no autonomous LLM planner.
+6. **Explicit stage ORDER:** figure-detect → figure-read (checklist) → **one extractor sub-agent PER variable** (fan-out) → reconcile (script) → locate (script) → verify (2nd model) → store (staging).
+7. **One sub-agent per variable** (the completeness fix for "captured 3 of 5"); each grabs the params in ITS equation.
+8. **Commands, not values:** the job carries commands (e.g. `figure:"auto"` = "an agent chooses"); the stored result records the REAL figure/value, never the command literal.
+9. **Deterministic-where-precise:** LLM only for judgment; scripts do lineage, param reconciliation (dedup shared β/σ…), completeness cross-check, checksums.
+10. **Locator:** pdfplumber text-match for prose + **vision grounding for equations** → `slot.rect` + verbatim verify, confidence tiers (exact/normalized/ambiguous/not-found); never fake positions.
+11. **Verifier:** singular smart verifier (2nd OpenAI model) audits the assembled model BEFORE storage; per-slot verdict stored; human still final (V8).
+12. **Staging → core:** land in staging w/ full lineage + verdict → human approve promotes to verified. Two human gates only (intake type, V8); passive elsewhere.
+13. **Persistent memory:** LangGraph Postgres checkpointer (Supabase, direct 5432), `thread_id = job id` (resume on crash); a separate `query prior verified extractions` tool = domain memory.
+14. **Hooks:** every stage emits a `validation_events` row (point, subject {script|agent|human}+version, outcome, latency, lineage, tags) → telemetry (Agent/Extraction Health).
+15. **Store it ALL each run:** checklist, per-variable, reconciled, locator, cross-check, verdict — auditable / cross-checkable.
+16. **Two audiences:** guided Walkthrough vs fast Bulk (lane column exists).
+17. **Tech:** Docker worker ↔ Supabase queue; OpenAI + Pydantic; **deepagents + LangGraph (current)** — `create_agent` leaf sub-agents over an explicit LangGraph `StateGraph`, NOT `create_deep_agent`'s autonomous planner (planner/filesystem/summarization middleware OFF); per-sub-agent Pydantic `response_format` (strict); temperature 0; low recursion_limit.
+18. **Honesty:** everything traces to source; replay framing; flag the unlocatable; never theater.
+
 ## The problem (Liz)
 
 Right now the worker does everything in one OpenAI call, and intake placeholders ("(auto)") leak
