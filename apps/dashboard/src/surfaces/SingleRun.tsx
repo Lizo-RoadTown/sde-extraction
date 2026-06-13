@@ -7,6 +7,7 @@ import {
 import { supabaseConfigured } from "../lib/supabase";
 import { Link } from "../router";
 import { detectFigures, type DetectedFigure } from "../figures";
+import { Loader } from "./Loader";
 import type { FigureExtraction } from "../types";
 import { Detail } from "./Verify";
 
@@ -240,8 +241,8 @@ export function SingleRun() {
       </fieldset>
 
       {phase.kind === "running" && (
-        <Card className="flex flex-col items-center gap-2 py-8 text-center">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-active" />
+        <Card className="flex flex-col items-center gap-3 py-8 text-center">
+          <Loader size={84} />
           <div className="text-sm text-ink">{STAGE_LABEL[phase.stage] ?? phase.stage}</div>
           <div className="text-xs text-ink-faint">Up to a minute — the worker polls, then the model reads the paper.</div>
           <div className="mt-1 rounded-md bg-active-soft px-3 py-1.5 text-[11px] text-active">
