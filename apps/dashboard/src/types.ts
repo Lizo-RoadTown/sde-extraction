@@ -59,6 +59,7 @@ export interface FigureExtraction {
   doi: string;
   status: ExtractionStatus;
   pdfUrl: string;
+  storagePath?: string; // the paper's storage path → signed PDF URL (the journey renders the real page)
   // --- what the figure required: each present/absent, with meaning ---
   variables: Variable[];
   parameters: Parameter[];

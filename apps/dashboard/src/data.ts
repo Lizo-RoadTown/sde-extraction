@@ -6,7 +6,7 @@
 import { supabase } from "./lib/supabase";
 import { isPreview } from "./usePreview";
 import { SAMPLE_ESCALATIONS } from "./preview";
-import type { FigureExtraction, Job } from "./types";
+import type { FigureExtraction, Job, Slot, Variable, Parameter, Term } from "./types";
 
 // ---- PDF storage: fingerprint, upload, signed URL ----------------------------
 // The PDF is the provenance root: it is SHA-256 fingerprinted the moment it lands,
@@ -72,23 +72,53 @@ export async function signedPdfUrl(storagePath: string, expiresInSec = 3600): Pr
   return data.signedUrl;
 }
 
+// Map a stored extraction row to the dashboard shape. The worker writes the Pydantic
+// model_dump() — SNAKE_CASE (figure_type, drift_terms, initial_value, time_span) — while the
+// preview sample uses camelCase. This reads BOTH (snake first, camel fallback) so real
+// extractions render fully; the slot interiors (value/meaning/quote/page/reason) already match.
 function rowToExtraction(row: Record<string, unknown>): FigureExtraction {
-  const m = (row.model ?? {}) as Partial<FigureExtraction> & Record<string, unknown>;
-  const absent = { status: "absent", reason: "not_stated" } as const;
+  const m = (row.model ?? {}) as Record<string, unknown>;
+  const absent: Slot = { status: "absent", reason: "not_stated" };
+  const pick = <T,>(o: Record<string, unknown>, a: string, b: string, d: T): T =>
+    (o[a] as T) ?? (o[b] as T) ?? d;
+
+  const variables: Variable[] = ((m.variables as Record<string, unknown>[]) ?? []).map((v) => ({
+    symbol: String(v.symbol ?? ""),
+    meaning: (v.meaning as Slot) ?? absent,
+    initialValue: pick<Slot>(v, "initial_value", "initialValue", absent),
+  }));
+  const parameters: Parameter[] = ((m.parameters as Record<string, unknown>[]) ?? []).map((p) => ({
+    symbol: String(p.symbol ?? ""),
+    value: (p.value as Slot) ?? absent,
+    meaning: (p.meaning as Slot) ?? absent,
+    units: (p.units as Slot) ?? absent,
+  }));
+  const mapTerms = (arr: unknown): Term[] =>
+    ((arr as Record<string, unknown>[]) ?? []).map((t) => ({
+      variable: String(t.variable ?? ""),
+      expression: (t.expression as Slot) ?? absent,
+    }));
+  const ts = (m.time_span ?? m.timeSpan ?? {}) as Record<string, unknown>;
+
   return {
     id: String(row.id),
-    figureLabel: (row.figure_label as string) ?? m.figureLabel ?? "",
-    figureType: (m.figureType as string) ?? "",
+    figureLabel: (row.figure_label as string) ?? pick<string>(m, "figure_label", "figureLabel", ""),
+    figureType: pick<string>(m, "figure_type", "figureType", ""),
     outcome: (m.outcome as string) ?? "",
-    pathogen: (row.pathogen as string) ?? m.pathogen ?? "",
-    doi: (row.doi as string) ?? m.doi ?? "",
+    pathogen: (row.pathogen as string) ?? (m.pathogen as string) ?? "",
+    doi: (row.doi as string) ?? (m.doi as string) ?? "",
     status: (row.status as FigureExtraction["status"]) ?? "needs_human",
     pdfUrl: (m.pdfUrl as string) ?? "#",
-    variables: m.variables ?? [],
-    parameters: m.parameters ?? [],
-    driftTerms: m.driftTerms ?? [],
-    diffusionTerms: m.diffusionTerms ?? [],
-    timeSpan: m.timeSpan ?? { initialTime: absent, finalTime: absent },
+    storagePath: (row.papers as { storage_path?: string } | null)?.storage_path
+      ?? (row.storage_path as string | undefined),
+    variables,
+    parameters,
+    driftTerms: mapTerms(m.drift_terms ?? m.driftTerms),
+    diffusionTerms: mapTerms(m.diffusion_terms ?? m.diffusionTerms),
+    timeSpan: {
+      initialTime: pick<Slot>(ts, "initial_time", "initialTime", absent),
+      finalTime: pick<Slot>(ts, "final_time", "finalTime", absent),
+    },
     figureReproduced: (row.figure_reproduced as boolean | null) ?? null,
   };
 }
@@ -138,7 +168,7 @@ export async function loadLatestExtraction(paperId: string): Promise<FigureExtra
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("extractions")
-    .select("*")
+    .select("*, papers(storage_path)")
     .eq("paper_id", paperId)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -218,7 +248,7 @@ export async function loadWorkItems(): Promise<WorkItem[]> {
 export async function loadEscalations(): Promise<FigureExtraction[]> {
   if (isPreview()) return SAMPLE_ESCALATIONS; // explicit preview mode → labeled sample data
   if (!supabase) return [];
-  const { data, error } = await supabase.from("extractions").select("*").eq("status", "needs_human");
+  const { data, error } = await supabase.from("extractions").select("*, papers(storage_path)").eq("status", "needs_human");
   if (error) { console.error("loadEscalations:", error.message); return []; }
   return (data ?? []).map(rowToExtraction);
 }
@@ -226,7 +256,7 @@ export async function loadEscalations(): Promise<FigureExtraction[]> {
 export async function loadExtraction(id: string): Promise<FigureExtraction | null> {
   if (isPreview()) return SAMPLE_ESCALATIONS.find((e) => e.id === id) ?? null;
   if (!supabase) return null;
-  const { data, error } = await supabase.from("extractions").select("*").eq("id", id).single();
+  const { data, error } = await supabase.from("extractions").select("*, papers(storage_path)").eq("id", id).single();
   if (error || !data) { if (error) console.error("loadExtraction:", error.message); return null; }
   return rowToExtraction(data);
 }
