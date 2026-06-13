@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { SectionTitle, Badge, SlotView, ConfidenceChip, cx } from "../ui";
+import { SectionTitle, Badge, ConfidenceChip, cx } from "../ui";
 import { Card } from "../ui";
 
 // Mock extractor-confidence for an item, deterministic from its id (stable across
@@ -35,76 +35,56 @@ function SlotRow({
   onJudge: (j: "present" | "absent") => void;
   onFocus: () => void;
 }) {
-  const engineSays: Slot["status"] = row.slot.status;
-  const canFocus = row.slot.status === "present"; // present slots have a quote+page to jump to
+  const slot = row.slot;
+  const present = slot.status === "present";
+  const btn = (j: "present" | "absent") => (
+    <button
+      type="button"
+      aria-pressed={judgment === j}
+      onClick={() => onJudge(j)}
+      className={cx(
+        "rounded px-2 py-0.5 text-[11px] transition focus-visible:outline focus-visible:outline-2",
+        j === "present"
+          ? (judgment === "present" ? "bg-present-soft text-present" : "bg-absent-soft text-ink-dim hover:text-ink")
+          : (judgment === "absent" ? "bg-attention-soft text-attention" : "bg-absent-soft text-ink-dim hover:text-ink"),
+      )}
+    >
+      {j}
+    </button>
+  );
   return (
     <div
       className={cx(
-        "flex items-start justify-between gap-4 border-b border-edge/60 py-2 last:border-0",
-        judgment === "unjudged" && "opacity-95", // subtle: still needs a decision
+        "grid grid-cols-[9rem_minmax(0,1fr)_minmax(0,1.3fr)_auto] items-center gap-3 border-b border-edge/40 py-1.5 last:border-0",
         focused && "bg-active-soft/40",
       )}
     >
-      <div className="flex items-start gap-3">
-        <span className="mono mt-0.5 w-28 shrink-0 text-xs text-active">{row.label}</span>
-        {canFocus ? (
-          <button type="button" onClick={onFocus} className="text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
-            title="show this quote in the PDF">
-            <SlotView slot={row.slot} />
-          </button>
+      {/* slot */}
+      <span className="mono truncate text-xs text-active" title={row.label}>{row.label}</span>
+      {/* captured value */}
+      <span className="truncate text-sm text-ink" title={present ? slot.value : undefined}>
+        {present ? slot.value : <span className="italic text-ink-faint">absent</span>}
+      </span>
+      {/* source — page + a TRUNCATED quote (full on hover); no repeated walls of text */}
+      <div className="flex min-w-0 items-center gap-2">
+        {present ? (
+          <>
+            <Badge tone="slate">p.{slot.page}</Badge>
+            <button type="button" onClick={onFocus} title={slot.quote}
+              className="truncate text-left text-[11px] text-ink-faint hover:text-ink-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-active">
+              “{slot.quote}”
+            </button>
+            {slot.located === false && <span title="quote not found on the page" className="shrink-0 text-[10px] text-invalid">⚠</span>}
+          </>
         ) : (
-          <SlotView slot={row.slot} />
+          <span className="text-[11px] text-ink-faint">{slot.reason}</span>
         )}
       </div>
-      {/* present/absent control — the core interaction. The verifier confirms or overrides
-          what the engine extracted; the chosen button lights with its semantic color. */}
+      {/* verify */}
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          aria-pressed={judgment === "present"}
-          onClick={() => onJudge("present")}
-          className={cx(
-            "rounded px-2 py-1 text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active",
-            judgment === "present"
-              ? "bg-present-soft text-present"
-              : "bg-absent-soft text-ink-dim hover:text-ink",
-          )}
-        >
-          present
-        </button>
-        <button
-          type="button"
-          aria-pressed={judgment === "absent"}
-          onClick={() => onJudge("absent")}
-          className={cx(
-            "rounded px-2 py-1 text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-attention",
-            judgment === "absent"
-              ? "bg-attention-soft text-attention"
-              : "bg-absent-soft text-ink-dim hover:text-ink",
-          )}
-        >
-          absent
-        </button>
-        {row.slot.status === "absent" && (
-          <select
-            aria-label="absence reason"
-            defaultValue={row.slot.reason}
-            className="rounded bg-surface-raised px-1.5 py-1 text-xs text-ink-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
-          >
-            <option value="not_stated">not_stated</option>
-            <option value="requires_inference">requires_inference</option>
-          </select>
-        )}
-        {/* unjudged marker — the decision the verifier still owes this slot */}
-        {judgment === "unjudged" && (
-          <span
-            className="ml-1 inline-flex items-center"
-            title={`engine extracted "${engineSays}" — confirm or override`}
-            aria-label="not yet judged"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-attention" />
-          </span>
-        )}
+        {btn("present")}
+        {btn("absent")}
+        {judgment === "unjudged" && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-attention" title="not yet judged" />}
       </div>
     </div>
   );
@@ -189,8 +169,15 @@ export function Detail({ ext, walkthrough = false, onResolved }: { ext: FigureEx
 
       <Card>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-ink">Slots — confirm present / absent</span>
+          <span className="text-sm font-medium text-ink">What {ext.figureLabel} required — confirm present / absent</span>
           <span className="text-xs text-ink-faint">{judgedCount}/{rows.length} judged</span>
+        </div>
+        {/* column header — so the rows read as a table, not a wall of text */}
+        <div className="grid grid-cols-[9rem_minmax(0,1fr)_minmax(0,1.3fr)_auto] gap-3 border-b border-edge pb-1 text-[10px] uppercase tracking-wide text-ink-faint">
+          <span>slot</span>
+          <span>captured value</span>
+          <span>source</span>
+          <span className="text-right">verify</span>
         </div>
         {rows.map((r, i) => (
           <SlotRow

@@ -110,7 +110,12 @@ def run(
             text_format=FigureExtraction,
         )
         result: FigureExtraction = response.output_parsed
-        return {"model": result.model_dump(), "checksums": checksums_for(result)}
+        model = result.model_dump()
+        # Locator hook (deterministic): pin each present quote's exact rect on the PDF and
+        # verify it's truly verbatim. Annotates the model in place (slot['rect'], slot['located']).
+        from locator import annotate_locations
+        model, locations = annotate_locations(pdf_path, model)
+        return {"model": model, "checksums": checksums_for(result), "locations": locations}
     finally:
         try:
             os.remove(pdf_path)

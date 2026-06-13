@@ -11,6 +11,8 @@ export type Slot =
       quote: string; // exact source text (the model quoted; the engine hashed)
       page: number;
       sha256?: string; // lineage proof, attached by the engine
+      rect?: { x: number; y: number; w: number; h: number }; // located position on the page (0..1), from the locator hook
+      located?: boolean; // did the locator find the quote on the page? (verbatim verification)
     }
   | { status: "absent"; reason: AbsenceReason };
 
