@@ -314,3 +314,37 @@ export async function loadValidationHealth(): Promise<ValidationHealth> {
   ]);
   return { extracted, needsHuman, verified, failedJobs };
 }
+
+// Real operational vitals for the ONE agent that runs today — the Extractor (the worker's
+// OpenAI call at V5). Derived from the job queue + extraction statuses. The orchestration's
+// other roles (Orchestrator / Validator / Storage) aren't built, so the Agent Health page
+// marks them planned rather than inventing numbers.
+export interface AgentHealth {
+  processed: number;  // jobs the extractor finished (stored + failed)
+  succeeded: number;  // jobs stored
+  failed: number;     // jobs failed
+  inFlight: number;   // queued / ingest / extract / machine_verify
+  needsHuman: number; // its output awaiting the human gate (V8 backlog)
+  verified: number;   // its output that passed V8 (downstream outcome — once verdicts are wired)
+}
+
+export async function loadAgentHealth(): Promise<AgentHealth> {
+  const zero: AgentHealth = { processed: 0, succeeded: 0, failed: 0, inFlight: 0, needsHuman: 0, verified: 0 };
+  if (!supabase) return zero;
+  const { data: jobs, error } = await supabase.from("extraction_jobs").select("stage");
+  if (error) { console.error("loadAgentHealth(jobs):", error.message); return zero; }
+  const tally: Record<string, number> = {};
+  for (const r of (jobs ?? []) as { stage: string }[]) tally[r.stage] = (tally[r.stage] ?? 0) + 1;
+  const succeeded = tally["stored"] ?? 0;
+  const failed = tally["failed"] ?? 0;
+  const total = (jobs ?? []).length;
+  const inFlight = total - succeeded - failed;
+
+  const statusCount = async (s: string): Promise<number> => {
+    const { count, error: e } = await supabase!.from("extractions").select("*", { count: "exact", head: true }).eq("status", s);
+    if (e) { console.error("loadAgentHealth(status):", e.message); return 0; }
+    return count ?? 0;
+  };
+  const [needsHuman, verified] = await Promise.all([statusCount("needs_human"), statusCount("verified")]);
+  return { processed: succeeded + failed, succeeded, failed, inFlight, needsHuman, verified };
+}

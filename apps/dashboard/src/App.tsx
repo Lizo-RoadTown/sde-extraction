@@ -2,6 +2,7 @@ import { SingleRun } from "./surfaces/SingleRun";
 import { Queue } from "./surfaces/Queue";
 import { Library } from "./surfaces/Library";
 import { ExtractionHealth } from "./surfaces/ExtractionHealth";
+import { AgentHealth } from "./surfaces/AgentHealth";
 import { VerifyPage } from "./surfaces/VerifyPage";
 import { FingerprintJourney } from "./surfaces/FingerprintJourney";
 import { SAMPLE_EXTRACTION } from "./preview";
@@ -19,7 +20,8 @@ const NAV: { to: string; label: string; blurb: string }[] = [
   { to: "/", label: "Walkthrough", blurb: "guided · see every step" },
   { to: "/queue", label: "Bulk", blurb: "ingest + verify, fast" },
   { to: "/library", label: "Library", blurb: "verified models" },
-  { to: "/health", label: "Extraction Health", blurb: "telemetry · confidence" },
+  { to: "/health", label: "Extraction Health", blurb: "gates · point health" },
+  { to: "/agents", label: "Agent Health", blurb: "the agents at each gate" },
 ];
 
 function isActive(route: string, to: string): boolean {
@@ -32,6 +34,7 @@ function CurrentView({ route }: { route: string }) {
   if (route === "/queue") return <Queue />;
   if (route === "/library") return <Library />;
   if (route === "/health") return <ExtractionHealth />;
+  if (route === "/agents") return <AgentHealth />;
   if (route === "/fingerprint") return <FingerprintJourney ext={SAMPLE_EXTRACTION} />; // aesthetic sandbox
   return <SingleRun />; // "/" and any unknown route
 }
