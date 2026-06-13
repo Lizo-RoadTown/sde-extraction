@@ -203,7 +203,11 @@ export function SingleRun() {
         <Card className="flex flex-col items-center gap-2 py-8 text-center">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-active" />
           <div className="text-sm text-ink">{STAGE_LABEL[phase.stage] ?? phase.stage}</div>
-          <div className="text-xs text-ink-faint">This can take up to a minute — the worker polls, then the model reads the paper.</div>
+          <div className="text-xs text-ink-faint">Up to a minute — the worker polls, then the model reads the paper.</div>
+          <div className="mt-1 rounded-md bg-active-soft px-3 py-1.5 text-[11px] text-active">
+            Stay on this page — your guided walkthrough (the page search + verify) opens right here when it’s ready.
+          </div>
+          <div className="text-[11px] text-ink-faint">Need to do many? <span className="text-ink-dim">Bulk</span> runs silently and you review later.</div>
         </Card>
       )}
 
