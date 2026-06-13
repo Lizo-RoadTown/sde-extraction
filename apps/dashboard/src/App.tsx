@@ -58,10 +58,11 @@ export default function App() {
     <div className="flex min-h-screen">
       {/* sidebar nav */}
       <aside className="flex w-56 flex-col border-r border-edge bg-inset/60 p-3">
-        <div className="mb-6 px-2 pt-2">
-          <div className="display text-xl text-ink">SDE <span className="display-accent">Extraction</span></div>
-          <div className="text-xs text-ink-faint">paper → provable model</div>
-        </div>
+        <Link to="/" title="Home — Walkthrough"
+          className="mb-6 block rounded-lg px-2 pt-2 pb-1 transition hover:bg-surface-raised/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-active">
+          <div className="display text-xl text-ink">⌂ SDE <span className="display-accent">Extraction</span></div>
+          <div className="text-xs text-ink-faint">paper → provable model · home</div>
+        </Link>
         <nav className="flex flex-col gap-1">
           {NAV.map((n) => (
             <Link
