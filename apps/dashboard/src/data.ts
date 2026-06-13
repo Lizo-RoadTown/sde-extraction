@@ -129,6 +129,7 @@ export interface JobTarget {
   mode: "auto" | "figure" | "model" | "whole";
   figure_ref?: string;
   model_desc?: string;
+  lane?: "walkthrough" | "bulk"; // which audience lane enqueued it (the worker copies it to the extraction)
 }
 
 /**
@@ -206,13 +207,18 @@ export async function loadWorkItems(): Promise<WorkItem[]> {
   if (!supabase) return [];
   const items: WorkItem[] = [];
 
+  // Bulk shows only bulk-lane work — Walkthrough papers are handled inline on the front
+  // page and must not clutter here (lane separation, migration 0004). NULL lane = legacy → shown.
+  const isWalkthrough = (lane: unknown) => lane === "walkthrough";
+
   // Extractions awaiting human review (the actionable set).
   const { data: exts, error: e1 } = await supabase
     .from("extractions")
-    .select("id, figure_label, status, updated_at, papers(title)")
+    .select("id, figure_label, status, updated_at, lane, papers(title)")
     .eq("status", "needs_human");
   if (e1) console.error("loadWorkItems(extractions):", e1.message);
   for (const r of (exts ?? []) as Record<string, unknown>[]) {
+    if (isWalkthrough(r.lane)) continue;
     items.push({
       key: `ext-${r.id}`,
       paperTitle: ((r.papers as { title?: string } | null)?.title) ?? "—",
@@ -223,14 +229,15 @@ export async function loadWorkItems(): Promise<WorkItem[]> {
     });
   }
 
-  // Jobs still in flight or failed (no extraction row to open yet).
+  // Jobs still in flight or failed (no extraction row to open yet). Lane lives in target.
   const { data: jobs, error: e2 } = await supabase
     .from("extraction_jobs")
-    .select("id, figure_label, stage, updated_at, papers(title)")
+    .select("id, figure_label, stage, updated_at, target, papers(title)")
     .not("stage", "in", "(stored)")
     .order("updated_at", { ascending: false });
   if (e2) console.error("loadWorkItems(jobs):", e2.message);
   for (const r of (jobs ?? []) as Record<string, unknown>[]) {
+    if (isWalkthrough((r.target as { lane?: string } | null)?.lane)) continue;
     const stage = String(r.stage);
     items.push({
       key: `job-${r.id}`,

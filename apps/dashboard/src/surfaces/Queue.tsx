@@ -53,7 +53,7 @@ export function Queue() {
       try {
         const paper = await uploadPaper(list[i]);
         if (!paper.paperId) throw new Error("not signed in — not stored");
-        const jobId = await enqueueJob(paper.paperId, "(auto)", { mode: "auto" });
+        const jobId = await enqueueJob(paper.paperId, "(auto)", { mode: "auto", lane: "bulk" });
         setBatch((prev) => prev.map((b, j) =>
           j === i ? { ...b, status: jobId ? "queued" : "error", message: jobId ? undefined : "queue failed" } : b));
       } catch (e) {

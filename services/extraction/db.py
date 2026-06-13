@@ -105,18 +105,21 @@ def write_extraction(
     doi: Optional[str],
     file_sha256: Optional[str],
     status: str = "needs_human",
+    lane: Optional[str] = None,
 ) -> str:
     """Insert the structured extraction (the present/absent VerifiedExtraction as
-    JSONB) and return its id. Indexed facets mirror supabase/migrations/0001_init.sql."""
+    JSONB) and return its id. Indexed facets mirror supabase/migrations/0001_init.sql.
+    `lane` records which audience lane produced it (walkthrough / bulk) so the Bulk queue
+    can filter Walkthrough-handled papers out (migration 0004)."""
     with conn.cursor() as cur:
         cur.execute(
             """
             insert into extractions
-                (paper_id, figure_label, status, model, pathogen, doi, file_sha256)
-            values (%s, %s, %s, %s, %s, %s, %s)
+                (paper_id, figure_label, status, model, pathogen, doi, file_sha256, lane)
+            values (%s, %s, %s, %s, %s, %s, %s, %s)
             returning id
             """,
-            (paper_id, figure_label, status, json.dumps(model), pathogen, doi, file_sha256),
+            (paper_id, figure_label, status, json.dumps(model), pathogen, doi, file_sha256, lane),
         )
         row = cur.fetchone()
         conn.commit()

@@ -99,6 +99,7 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
             doi=paper.get("doi"),
             file_sha256=paper.get("file_sha256"),
             status="needs_human",
+            lane=target.get("lane"),  # walkthrough / bulk — so Bulk can hide Walkthrough work
         )
         db.update_job(conn, job_id, stage="stored", progress=1.0)
         print(f"job {job_id}: stored extraction {ext_id} (needs_human)")

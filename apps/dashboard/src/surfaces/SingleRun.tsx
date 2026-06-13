@@ -70,9 +70,9 @@ export function SingleRun() {
   async function startExtraction() {
     if (!paperId) return;
     const target: JobTarget =
-      mode === "figure" ? { mode, figure_ref: figureRef }
-      : mode === "model" ? { mode, model_desc: modelDesc }
-      : { mode };
+      mode === "figure" ? { mode, figure_ref: figureRef, lane: "walkthrough" }
+      : mode === "model" ? { mode, model_desc: modelDesc, lane: "walkthrough" }
+      : { mode, lane: "walkthrough" };
     const label = mode === "figure" ? (figureRef || "(figure)") : mode === "auto" ? "(auto)" : `(${mode})`;
     const jobId = await enqueueJob(paperId, label, target);
     if (!jobId) { setPhase({ kind: "failed", message: "Couldn't queue the job — are you signed in?" }); return; }
