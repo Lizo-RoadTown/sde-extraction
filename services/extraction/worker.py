@@ -47,6 +47,7 @@ for _canonical, _alts in _ALIASES.items():
                 break
 
 import db
+import hooks
 import processor
 
 POLL_INTERVAL = float(os.environ.get("POLL_INTERVAL", "30"))
@@ -91,12 +92,26 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
 
         db.update_job(conn, job_id, stage="machine_verify", progress=0.8)
         model = {**result["model"], "_checksums": result["checksums"]}
+        pid = str(job["paper_id"])
+        # Hooks (best-effort telemetry → validation_events): the extract + locate stages.
+        locs = result.get("locations") or {}
+        hooks.emit(conn, point="extract", subject_kind="agent", outcome="pass",
+                   job_id=job_id, paper_id=pid, thread_id=job_id,
+                   subject_id=f"extractor:{processor.MODEL}",
+                   tags={"vars": len(model.get("variables") or []),
+                         "params": len(model.get("parameters") or []),
+                         "drift": len(model.get("drift_terms") or []),
+                         "diffusion": len(model.get("diffusion_terms") or [])})
+        hooks.emit(conn, point="locate", subject_kind="script",
+                   outcome="pass" if locs.get("located") else "flag",
+                   job_id=job_id, paper_id=pid, thread_id=job_id,
+                   subject_id="locator:pdfplumber", tags=locs)
         # The figure is the anchor — record WHICH figure was extracted. 'auto' means the engine
         # chose; store its choice (the model's own figure_label), not the '(auto)' placeholder.
         figure = (model.get("figure_label") or "").strip() or figure_label or "(figure)"
         ext_id = db.write_extraction(
             conn,
-            paper_id=str(job["paper_id"]),
+            paper_id=pid,
             figure_label=figure,
             model=model,
             pathogen=paper.get("pathogen"),
@@ -106,6 +121,9 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
             lane=target.get("lane"),  # walkthrough / bulk — so Bulk can hide Walkthrough work
         )
         db.update_job(conn, job_id, stage="stored", progress=1.0)
+        hooks.emit(conn, point="store", subject_kind="script", outcome="pass",
+                   job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="storage",
+                   lineage_ref=ext_id, tags={"status": "needs_human", "lane": target.get("lane")})
         print(f"job {job_id}: stored extraction {ext_id} (needs_human)")
     except Exception as e:  # noqa: BLE001 — one bad job shouldn't stop the worker
         print(f"job {job_id}: FAILED — {e}")

@@ -95,6 +95,36 @@ def get_paper(conn: psycopg.Connection, paper_id: str) -> Optional[dict[str, Any
         return cur.fetchone()
 
 
+def record_validation_event(
+    conn: psycopg.Connection,
+    *,
+    point: str,
+    subject_kind: str,
+    outcome: str,
+    job_id: Optional[str] = None,
+    paper_id: Optional[str] = None,
+    thread_id: Optional[str] = None,
+    subject_id: Optional[str] = None,
+    latency_ms: Optional[int] = None,
+    lineage_ref: Optional[str] = None,
+    tags: Optional[dict[str, Any]] = None,
+) -> None:
+    """Append one validation_events row — the hook every pipeline stage fires (migration 0005).
+    Best-effort: a telemetry write must never break the pipeline, so callers wrap it in try/except."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into validation_events
+                (job_id, paper_id, thread_id, point, subject_kind, subject_id,
+                 outcome, latency_ms, lineage_ref, tags)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (job_id, paper_id, thread_id, point, subject_kind, subject_id,
+             outcome, latency_ms, lineage_ref, json.dumps(tags or {})),
+        )
+        conn.commit()
+
+
 def write_extraction(
     conn: psycopg.Connection,
     *,
