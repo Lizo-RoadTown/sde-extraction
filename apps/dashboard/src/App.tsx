@@ -13,9 +13,11 @@ import { useRoute, matchVerify, Link } from "./router";
 // Real routing (hash-based) so every view is a back-able URL. The work splits in two:
 // a Single-run page that does one paper end to end inline, and a Queue page for batches
 // where each item opens its own verify page.
+// The first two tabs are the two AUDIENCES (Liz): a guided walkthrough for new/skeptical
+// users who want to see the proof, and a fast bulk lane for power users who already trust it.
 const NAV: { to: string; label: string; blurb: string }[] = [
-  { to: "/", label: "Single run", blurb: "one paper · verify inline" },
-  { to: "/queue", label: "Queue", blurb: "batch · awaiting review" },
+  { to: "/", label: "Walkthrough", blurb: "guided · see every step" },
+  { to: "/queue", label: "Bulk", blurb: "ingest + verify, fast" },
   { to: "/library", label: "Library", blurb: "verified models" },
   { to: "/health", label: "Extraction Health", blurb: "telemetry · confidence" },
 ];

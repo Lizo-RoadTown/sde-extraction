@@ -69,8 +69,8 @@ export function Queue() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
-        <SectionTitle hint="Every paper in flight or awaiting review. Click one that needs review to open its own verify page — Back brings you right back here.">
-          Queue
+        <SectionTitle hint="The fast lane: deploy or upload in bulk, let it run silently, come back and rip through verifications. No walkthrough — click an item that needs review to verify it directly.">
+          Bulk
         </SectionTitle>
 
         {/* Deploy ▾ — the source map: where the extractor plugs in. */}

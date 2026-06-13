@@ -110,7 +110,10 @@ function SlotRow({
   );
 }
 
-export function Detail({ ext }: { ext: FigureExtraction }) {
+// `walkthrough` = the guided front-page experience (undergrads / skeptics): show the
+// cinematic spotlight search. The power-user lane (bulk queue) leaves it off — PhDs verify
+// fast and don't need the walkthrough.
+export function Detail({ ext, walkthrough = false }: { ext: FigureExtraction; walkthrough?: boolean }) {
   // Flatten everything the FIGURE required into present/absent rows. Each variable and
   // parameter contributes several slots (meaning, value/initial-condition, units) — every
   // piece the figure needed, each judged present/absent against the source.
@@ -157,8 +160,8 @@ export function Detail({ ext }: { ext: FigureExtraction }) {
         <a href={ext.pdfUrl} className="rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
       </div>
 
-      {/* the lineage made visible: the cinematic spotlight search over the real PDF */}
-      <SpotlightQuest ext={ext} />
+      {/* the lineage made visible: the cinematic spotlight search — guided lane only */}
+      {walkthrough && <SpotlightQuest ext={ext} />}
 
       {/* source PDF on top (full width), figure-compare oracle stacked beneath it —
           both need room; side-by-side made the figure images tiny. */}

@@ -115,8 +115,8 @@ export function SingleRun() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <SectionTitle hint="One paper, start to finish: add it, extract, and verify the result right here. Doing many? Use the Queue.">
-        Single run
+      <SectionTitle hint="Walk the whole process: add a paper, watch the engine search the page for what the figure needed, and verify the result — with the proof in view. New here or want to see how it works? Start here. Doing many at once? Use Bulk.">
+        Walkthrough
       </SectionTitle>
 
       {/* compose — upload + targeting. Disabled while a run is in flight. */}
@@ -225,7 +225,7 @@ export function SingleRun() {
               <button type="button" onClick={reset} className="text-xs text-active hover:underline">+ new paper</button>
             </div>
           </div>
-          <Detail key={phase.ext.id} ext={phase.ext} />
+          <Detail key={phase.ext.id} ext={phase.ext} walkthrough />
         </div>
       )}
     </div>
