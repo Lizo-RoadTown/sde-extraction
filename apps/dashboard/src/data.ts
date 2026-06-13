@@ -254,3 +254,33 @@ export async function loadJobs(): Promise<Job[]> {
     updatedAt: String(r.updated_at),
   }));
 }
+
+// Real throughput at the validation gates that have live data today: V5 (everything in
+// `extractions` passed schema), V8 backlog (`needs_human`) and V8 pass (`verified`), plus
+// failed jobs. The fetch/lineage/figure gates (V1–V4, V6, V7) aren't emitted yet — the
+// chain visual marks those designed/conditional rather than faking a number.
+export interface ValidationHealth {
+  extracted: number;   // rows in `extractions` — all passed V5 (schema valid)
+  needsHuman: number;  // status needs_human — the backlog before the human gate V8
+  verified: number;    // status verified — passed V8
+  failedJobs: number;  // extraction_jobs in stage 'failed'
+}
+
+export async function loadValidationHealth(): Promise<ValidationHealth> {
+  const zero: ValidationHealth = { extracted: 0, needsHuman: 0, verified: 0, failedJobs: 0 };
+  if (!supabase) return zero;
+  const count = async (table: string, col?: string, val?: string): Promise<number> => {
+    let q = supabase!.from(table).select("*", { count: "exact", head: true });
+    if (col) q = q.eq(col, val);
+    const { count: c, error } = await q;
+    if (error) { console.error(`loadValidationHealth(${table}):`, error.message); return 0; }
+    return c ?? 0;
+  };
+  const [extracted, needsHuman, verified, failedJobs] = await Promise.all([
+    count("extractions"),
+    count("extractions", "status", "needs_human"),
+    count("extractions", "status", "verified"),
+    count("extraction_jobs", "stage", "failed"),
+  ]);
+  return { extracted, needsHuman, verified, failedJobs };
+}

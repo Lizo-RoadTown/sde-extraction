@@ -1,4 +1,5 @@
 import { Card, SectionTitle, Badge, StatCard } from "../ui";
+import { ValidationChain } from "./ValidationChain";
 
 // Extraction Health — "how well is the engine doing, and is it improving?"
 // Two real concerns in one home: CONFIDENCE (earned per extractor x dimension-value)
@@ -58,16 +59,25 @@ function ConfidenceRow({ tag, score, n }: { tag: string; score: number; n: numbe
 export function ExtractionHealth() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <SectionTitle hint="How well the engine extracts, by document type — and how it improves over time. Confidence is earned from your verifications; it is never assigned.">
+      <SectionTitle hint="Every boundary the data crosses is a validation gate, and the health of each. Confidence is earned from your verifications; it is never assigned.">
         Extraction Health
       </SectionTitle>
 
-      {/* headline gauges */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Figure-repro pass" value="86%" tone="green" />
-        <StatCard label="Present / absent" value="73 / 27" tone="cyan" />
-        <StatCard label="Avg verify" value="3.4m" />
-        <StatCard label="Extractor trust" value="0.81" tone="cyan" />
+      {/* the validation chain — the telemetry spine as a diagram, with real counts where they exist */}
+      <ValidationChain />
+
+      {/* headline gauges (sample until the per-gate telemetry events are emitted) */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-medium text-ink">Headline gauges</span>
+          <Badge tone="slate">not yet live · sample</Badge>
+        </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <StatCard label="Figure-repro pass" value="86%" tone="green" />
+          <StatCard label="Present / absent" value="73 / 27" tone="cyan" />
+          <StatCard label="Avg verify" value="3.4m" />
+          <StatCard label="Extractor trust" value="0.81" tone="cyan" />
+        </div>
       </div>
 
       {/* confidence by dimension — the vector, not a blended score */}
