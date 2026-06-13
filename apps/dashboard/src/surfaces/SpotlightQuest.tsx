@@ -48,6 +48,9 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 const center = (r: Rect): Pt => ({ x: (r.x + r.w / 2) * 100, y: (r.y + r.h / 2) * 100 });
+// a scanning point when we DON'T have a real position yet (locator not run) — keeps the lens
+// alive/searching without claiming precision; the precise highlight box only draws when located.
+const scatter = (i: number): Pt => ({ x: 22 + ((i * 37) % 56), y: 18 + ((i * 53) % 58) });
 const metallic: CSSProperties = {
   backgroundImage: "linear-gradient(hsl(0 0% 96%), hsl(0 0% 55%))",
   WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
@@ -115,7 +118,7 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
     if (!f) { setDone(true); return; }
     setPage(f.page);
     setRevealed(false);
-    if (f.rect) target.current = center(f.rect); // only aim where we truly located it
+    target.current = f.rect ? center(f.rect) : scatter(step); // land if located, else scan
     const t1 = window.setTimeout(() => setRevealed(true), f.rect ? 800 : 450);
     const t2 = window.setTimeout(() => { if (step + 1 >= finds.length) setDone(true); else setStep(step + 1); }, 1900);
     return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
@@ -133,6 +136,20 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
     );
   }
   if (!resolved) return <div className="rounded-xl border border-edge bg-inset p-6 text-center text-xs text-ink-faint">loading source…</div>;
+
+  // Nothing to search — no present values for this figure (e.g. the paper has no SDE model here).
+  // Show it honestly instead of a frozen lens.
+  if (finds.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-edge bg-inset p-8 text-center">
+        <div className="text-sm text-ink">Nothing to search</div>
+        <div className="mt-1 text-xs text-ink-faint">
+          No present values were captured for {ext.figureLabel} — there’s no model or parameters to highlight.
+          {misses > 0 && <> {misses} slot(s) came back absent.</>} This paper may not contain an SDE for this figure.
+        </div>
+      </div>
+    );
+  }
 
   const found = Math.min(step + (revealed ? 1 : 0), finds.length);
   const caption = done ? "search complete"
