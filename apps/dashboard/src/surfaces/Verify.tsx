@@ -12,7 +12,7 @@ function mockConfidence(id: string): number {
 import { loadEscalations } from "../data";
 import { PdfPane } from "./PdfPane";
 import { FigurePane } from "./FigurePane";
-import { PdfQuest } from "./PdfQuest";
+import { SpotlightQuest } from "./SpotlightQuest";
 import type { FigureExtraction, Slot } from "../types";
 
 // The slot the verifier is focused on — drives the PDF pane's jump-to-source.
@@ -157,8 +157,8 @@ export function Detail({ ext }: { ext: FigureExtraction }) {
         <a href={ext.pdfUrl} className="rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
       </div>
 
-      {/* the lineage made visible: the search quest over the real PDF — finds, hashes, verdict */}
-      <PdfQuest ext={ext} />
+      {/* the lineage made visible: the cinematic spotlight search over the real PDF */}
+      <SpotlightQuest ext={ext} />
 
       {/* source PDF on top (full width), figure-compare oracle stacked beneath it —
           both need room; side-by-side made the figure images tiny. */}
