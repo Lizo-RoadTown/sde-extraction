@@ -90,11 +90,15 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
         )
 
         db.update_job(conn, job_id, stage="machine_verify", progress=0.8)
+        model = {**result["model"], "_checksums": result["checksums"]}
+        # The figure is the anchor — record WHICH figure was extracted. 'auto' means the engine
+        # chose; store its choice (the model's own figure_label), not the '(auto)' placeholder.
+        figure = (model.get("figure_label") or "").strip() or figure_label or "(figure)"
         ext_id = db.write_extraction(
             conn,
             paper_id=str(job["paper_id"]),
-            figure_label=figure_label,
-            model={**result["model"], "_checksums": result["checksums"]},
+            figure_label=figure,
+            model=model,
             pathogen=paper.get("pathogen"),
             doi=paper.get("doi"),
             file_sha256=paper.get("file_sha256"),

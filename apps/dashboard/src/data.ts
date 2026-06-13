@@ -102,7 +102,13 @@ function rowToExtraction(row: Record<string, unknown>): FigureExtraction {
 
   return {
     id: String(row.id),
-    figureLabel: (row.figure_label as string) ?? pick<string>(m, "figure_label", "figureLabel", ""),
+    // The figure is the anchor: prefer the real figure the model identified over the
+    // '(auto)' intake placeholder still sitting in the column on older rows.
+    figureLabel: (() => {
+      const col = (row.figure_label as string | undefined)?.trim();
+      const fromModel = pick<string>(m, "figure_label", "figureLabel", "");
+      return col && col !== "(auto)" ? col : (fromModel || col || "");
+    })(),
     figureType: pick<string>(m, "figure_type", "figureType", ""),
     outcome: (m.outcome as string) ?? "",
     pathogen: (row.pathogen as string) ?? (m.pathogen as string) ?? "",
