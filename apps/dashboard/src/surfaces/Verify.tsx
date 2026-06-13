@@ -9,7 +9,7 @@ function mockConfidence(id: string): number {
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 1000;
   return 0.35 + (h / 1000) * 0.6; // 0.35–0.95
 }
-import { loadEscalations } from "../data";
+import { loadEscalations, submitVerdict } from "../data";
 import { PdfPane } from "./PdfPane";
 import { FigurePane } from "./FigurePane";
 import { SpotlightQuest } from "./SpotlightQuest";
@@ -113,7 +113,7 @@ function SlotRow({
 // `walkthrough` = the guided front-page experience (undergrads / skeptics): show the
 // cinematic spotlight search. The power-user lane (bulk queue) leaves it off — PhDs verify
 // fast and don't need the walkthrough.
-export function Detail({ ext, walkthrough = false }: { ext: FigureExtraction; walkthrough?: boolean }) {
+export function Detail({ ext, walkthrough = false, onResolved }: { ext: FigureExtraction; walkthrough?: boolean; onResolved?: (d: "approve" | "send_back") => void }) {
   // Flatten everything the FIGURE required into present/absent rows. Each variable and
   // parameter contributes several slots (meaning, value/initial-condition, units) — every
   // piece the figure needed, each judged present/absent against the source.
@@ -147,28 +147,45 @@ export function Detail({ ext, walkthrough = false }: { ext: FigureExtraction; wa
   const judgedCount = Object.keys(judgments).length;
   const allJudged = judgedCount === rows.length;
 
+  // the human gate (V8): submit the verdict, move the extraction, log it.
+  const [verdict, setVerdict] = useState<null | "saving" | "approve" | "send_back">(null);
+  async function decide(d: "approve" | "send_back") {
+    setVerdict("saving");
+    const ok = await submitVerdict(ext.id, d);
+    if (ok) { setVerdict(d); onResolved?.(d); }
+    else setVerdict(null);
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4">
-      {/* the FIGURE — the anchor. It exists; it is not present/absent. Everything below it is. */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="display text-lg text-ink">{ext.figureLabel}</span>
-          {ext.figureType && <Badge tone="cyan">{ext.figureType}</Badge>}
-          {ext.outcome && <Badge tone={ext.outcome === "successful" ? "green" : "amber"}>{ext.outcome}</Badge>}
-          <span className="text-xs text-ink-faint">{ext.pathogen} · {ext.doi}</span>
+      {/* THE FIGURE — the anchor, led with first. Everything else is what it required to be produced. */}
+      <Card className="border-active-edge/60 bg-active-soft/20">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-active">the figure · the anchor</div>
+            <div className="display text-lg text-ink">{ext.figureType || ext.figureLabel || "Figure"}</div>
+            {ext.outcome && <div className="mt-0.5 text-sm text-ink-dim">{ext.outcome}</div>}
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
+              {ext.figureLabel && ext.figureLabel !== "(auto)" && <Badge tone="cyan">{ext.figureLabel}</Badge>}
+              {ext.pathogen && <span>{ext.pathogen}</span>}
+              {ext.doi && <span>· {ext.doi}</span>}
+            </div>
+          </div>
+          <a href={ext.pdfUrl} className="shrink-0 rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
         </div>
-        <a href={ext.pdfUrl} className="rounded-md bg-surface-raised px-3 py-1.5 text-xs text-ink hover:bg-edge">open PDF ↗</a>
-      </div>
+        <div className="mt-3"><FigurePane ext={ext} /></div>
+        <p className="mt-2 text-[11px] text-ink-faint">
+          This figure is the <span className="text-ink-dim">anchor</span> — a produced outcome that exists. Everything below
+          is what it <span className="text-ink-dim">required</span> to be produced, searched backward from it and confirmed present or absent.
+        </p>
+      </Card>
 
       {/* the lineage made visible: the cinematic spotlight search — guided lane only */}
       {walkthrough && <SpotlightQuest ext={ext} />}
 
       {/* source PDF on top (full width), figure-compare oracle stacked beneath it —
           both need room; side-by-side made the figure images tiny. */}
-      <div className="flex flex-col gap-4">
-        <PdfPane pdfUrl={ext.pdfUrl} storagePath={ext.storagePath} targetPage={focus?.page} quote={focus?.quote} />
-        <FigurePane ext={ext} />
-      </div>
+      <PdfPane pdfUrl={ext.pdfUrl} storagePath={ext.storagePath} targetPage={focus?.page} quote={focus?.quote} />
 
       <Card>
         <div className="mb-2 flex items-center justify-between">
@@ -196,25 +213,33 @@ export function Detail({ ext, walkthrough = false }: { ext: FigureExtraction; wa
         </div>
       </Card>
 
-      <div className="flex items-center justify-end gap-3">
-        {/* rule zero: the verifier commits to every slot before the system lets them store. */}
-        {!allJudged && (
-          <span className="text-xs text-ink-faint">{rows.length - judgedCount} slot(s) still need a judgment</span>
-        )}
-        <button type="button" className="rounded-md bg-surface-raised px-4 py-2 text-sm text-ink hover:bg-edge">Send back</button>
-        <button
-          type="button"
-          disabled={!allJudged}
-          className={cx(
-            "rounded-md px-4 py-2 text-sm transition",
-            allJudged
-              ? "bg-present-soft text-present hover:brightness-110"
-              : "cursor-not-allowed bg-absent-soft text-ink-faint opacity-50",
+      {verdict === "approve" || verdict === "send_back" ? (
+        <div className={cx("rounded-md px-4 py-3 text-sm", verdict === "approve" ? "bg-present-soft text-present" : "bg-attention-soft text-attention")}>
+          {verdict === "approve" ? "✓ Approved & stored — moved to the Library." : "↩ Sent back — recorded as rejected."}
+        </div>
+      ) : (
+        <div className="flex items-center justify-end gap-3">
+          {/* rule zero: the verifier commits to every slot before the system lets them store. */}
+          {!allJudged && (
+            <span className="text-xs text-ink-faint">{rows.length - judgedCount} slot(s) still need a judgment</span>
           )}
-        >
-          Approve &amp; store
-        </button>
-      </div>
+          <button type="button" disabled={verdict === "saving"} onClick={() => decide("send_back")}
+            className="rounded-md bg-surface-raised px-4 py-2 text-sm text-ink hover:bg-edge disabled:opacity-50">Send back</button>
+          <button
+            type="button"
+            disabled={!allJudged || verdict === "saving"}
+            onClick={() => decide("approve")}
+            className={cx(
+              "rounded-md px-4 py-2 text-sm transition",
+              allJudged && verdict !== "saving"
+                ? "bg-present-soft text-present hover:brightness-110"
+                : "cursor-not-allowed bg-absent-soft text-ink-faint opacity-50",
+            )}
+          >
+            {verdict === "saving" ? "saving…" : "Approve & store"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

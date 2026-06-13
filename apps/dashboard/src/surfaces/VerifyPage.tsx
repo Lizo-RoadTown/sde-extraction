@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "../ui";
 import { loadExtraction } from "../data";
-import { Link } from "../router";
+import { Link, navigate } from "../router";
 import { Detail } from "./Verify";
 import type { FigureExtraction } from "../types";
 
@@ -27,7 +27,7 @@ export function VerifyPage({ id }: { id: string }) {
           That extraction couldn’t be found. It may have been removed.
         </Card>
       ) : (
-        <Detail key={ext.id} ext={ext} />
+        <Detail key={ext.id} ext={ext} onResolved={() => navigate("/queue")} />
       )}
     </div>
   );

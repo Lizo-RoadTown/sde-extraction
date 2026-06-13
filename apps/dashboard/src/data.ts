@@ -268,6 +268,25 @@ export async function loadExtraction(id: string): Promise<FigureExtraction | nul
   return rowToExtraction(data);
 }
 
+// The human gate (V8): record the reviewer's verdict and move the extraction. Approve →
+// 'verified' (leaves the queue, enters the Library); send back → 'failed' (human-rejected).
+// Logged in review_decisions either way. (RLS: "authed full access" — a signed-in user may write.)
+export async function submitVerdict(
+  extractionId: string,
+  decision: "approve" | "send_back",
+  reason?: string,
+): Promise<boolean> {
+  if (!supabase) return false;
+  const status = decision === "approve" ? "verified" : "failed";
+  const { error } = await supabase.from("extractions").update({ status }).eq("id", extractionId);
+  if (error) { console.error("submitVerdict(status):", error.message); return false; }
+  const { error: e2 } = await supabase
+    .from("review_decisions")
+    .insert({ extraction_id: extractionId, reviewer: "Liz", decision, reason: reason ?? null });
+  if (e2) console.error("submitVerdict(log):", e2.message); // logging is best-effort; the move already happened
+  return true;
+}
+
 export async function loadLibrary(): Promise<FigureExtraction[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from("extractions").select("*").eq("status", "verified");
