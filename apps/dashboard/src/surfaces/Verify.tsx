@@ -18,40 +18,17 @@ import type { FigureExtraction, Slot } from "../types";
 // The slot the verifier is focused on — drives the PDF pane's jump-to-source.
 type Focus = { page: number; quote: string } | null;
 
-// The verifier's judgment on one slot. "unjudged" is a real, distinct state —
-// per docs/UX_CONTRACT.md, judged-absent must never look like not-yet-reviewed.
-type Judgment = "unjudged" | "present" | "absent";
-
 function SlotRow({
   row,
-  judgment,
   focused,
-  onJudge,
   onFocus,
 }: {
   row: { label: string; slot: Slot };
-  judgment: Judgment;
   focused: boolean;
-  onJudge: (j: "present" | "absent") => void;
   onFocus: () => void;
 }) {
   const slot = row.slot;
   const present = slot.status === "present";
-  const btn = (j: "present" | "absent") => (
-    <button
-      type="button"
-      aria-pressed={judgment === j}
-      onClick={() => onJudge(j)}
-      className={cx(
-        "rounded px-2 py-0.5 text-[11px] transition focus-visible:outline focus-visible:outline-2",
-        j === "present"
-          ? (judgment === "present" ? "bg-present-soft text-present" : "bg-absent-soft text-ink-dim hover:text-ink")
-          : (judgment === "absent" ? "bg-attention-soft text-attention" : "bg-absent-soft text-ink-dim hover:text-ink"),
-      )}
-    >
-      {j}
-    </button>
-  );
   return (
     <div
       className={cx(
@@ -63,9 +40,9 @@ function SlotRow({
       <span className="mono truncate text-xs text-active" title={row.label}>{row.label}</span>
       {/* captured value */}
       <span className="truncate text-sm text-ink" title={present ? slot.value : undefined}>
-        {present ? slot.value : <span className="italic text-ink-faint">absent</span>}
+        {present ? slot.value : <span className="text-ink-faint">—</span>}
       </span>
-      {/* source — page + a TRUNCATED quote (full on hover); no repeated walls of text */}
+      {/* source — page + a TRUNCATED quote (full on hover) */}
       <div className="flex min-w-0 items-center gap-2">
         {present ? (
           <>
@@ -77,14 +54,14 @@ function SlotRow({
             {slot.located === false && <span title="quote not found on the page" className="shrink-0 text-[10px] text-invalid">⚠</span>}
           </>
         ) : (
-          <span className="text-[11px] text-ink-faint">{slot.reason}</span>
+          <span className="text-[11px] text-ink-faint">—</span>
         )}
       </div>
-      {/* verify */}
-      <div className="flex shrink-0 items-center gap-1">
-        {btn("present")}
-        {btn("absent")}
-        {judgment === "unjudged" && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-attention" title="not yet judged" />}
+      {/* state — present, or absent + reason. That's the useful information. */}
+      <div className="shrink-0 text-right">
+        {present
+          ? <span className="rounded bg-present-soft px-2 py-0.5 text-[11px] text-present">present</span>
+          : <span className="rounded bg-attention-soft px-2 py-0.5 text-[11px] text-attention">absent · {slot.reason}</span>}
       </div>
     </div>
   );
@@ -160,16 +137,11 @@ export function Detail({ ext, walkthrough = false, onResolved }: { ext: FigureEx
     [ext],
   );
 
-  // Verifier judgments, keyed by row index. (Detail is mounted with key={ext.id} by the
-  // parent, so switching extractions remounts this fresh — no manual reset needed.)
-  const [judgments, setJudgments] = useState<Record<number, "present" | "absent">>({});
-
   // Which slot is focused in the PDF pane, and which row index it maps to.
   const [focus, setFocus] = useState<Focus>(null);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
 
-  const judgedCount = Object.keys(judgments).length;
-  const allJudged = judgedCount === rows.length;
+  const presentCount = rows.filter((r) => r.slot.status === "present").length;
 
   // the human gate (V8): submit the verdict, move the extraction, log it.
   const [verdict, setVerdict] = useState<null | "saving" | "approve" | "send_back">(null);
@@ -216,23 +188,21 @@ export function Detail({ ext, walkthrough = false, onResolved }: { ext: FigureEx
 
       <Card>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-ink">What {ext.figureLabel} required — confirm present / absent</span>
-          <span className="text-xs text-ink-faint">{judgedCount}/{rows.length} judged</span>
+          <span className="text-sm font-medium text-ink">What {ext.figureLabel} required — present / absent</span>
+          <span className="text-xs text-ink-faint">{presentCount} present · {rows.length - presentCount} absent</span>
         </div>
         {/* column header — so the rows read as a table, not a wall of text */}
         <div className="grid grid-cols-[9rem_minmax(0,1fr)_minmax(0,1.3fr)_auto] gap-3 border-b border-edge pb-1 text-[10px] uppercase tracking-wide text-ink-faint">
           <span>slot</span>
           <span>captured value</span>
           <span>source</span>
-          <span className="text-right">verify</span>
+          <span className="text-right">state</span>
         </div>
         {rows.map((r, i) => (
           <SlotRow
             key={i}
             row={r}
-            judgment={judgments[i] ?? "unjudged"}
             focused={focusIdx === i}
-            onJudge={(j) => setJudgments((prev) => ({ ...prev, [i]: j }))}
             onFocus={() => {
               if (r.slot.status === "present") {
                 setFocus({ page: r.slot.page, quote: r.slot.quote });
@@ -242,8 +212,7 @@ export function Detail({ ext, walkthrough = false, onResolved }: { ext: FigureEx
           />
         ))}
         <div className="mt-3 rounded-md bg-surface-raised/60 px-3 py-2 text-xs text-ink-faint">
-          These are everything <span className="text-ink-dim">{ext.figureLabel}</span> required to be produced —
-          searched backward from the figure, each confirmed present or absent against the source.
+          Everything <span className="text-ink-dim">{ext.figureLabel}</span> required — each present (with its source) or absent (with the reason).
         </div>
       </Card>
 
@@ -253,23 +222,10 @@ export function Detail({ ext, walkthrough = false, onResolved }: { ext: FigureEx
         </div>
       ) : (
         <div className="flex items-center justify-end gap-3">
-          {/* rule zero: the verifier commits to every slot before the system lets them store. */}
-          {!allJudged && (
-            <span className="text-xs text-ink-faint">{rows.length - judgedCount} slot(s) still need a judgment</span>
-          )}
           <button type="button" disabled={verdict === "saving"} onClick={() => decide("send_back")}
             className="rounded-md bg-surface-raised px-4 py-2 text-sm text-ink hover:bg-edge disabled:opacity-50">Send back</button>
-          <button
-            type="button"
-            disabled={!allJudged || verdict === "saving"}
-            onClick={() => decide("approve")}
-            className={cx(
-              "rounded-md px-4 py-2 text-sm transition",
-              allJudged && verdict !== "saving"
-                ? "bg-present-soft text-present hover:brightness-110"
-                : "cursor-not-allowed bg-absent-soft text-ink-faint opacity-50",
-            )}
-          >
+          <button type="button" disabled={verdict === "saving"} onClick={() => decide("approve")}
+            className="rounded-md bg-present-soft px-4 py-2 text-sm text-present transition hover:brightness-110 disabled:opacity-50">
             {verdict === "saving" ? "saving…" : "Approve & store"}
           </button>
         </div>

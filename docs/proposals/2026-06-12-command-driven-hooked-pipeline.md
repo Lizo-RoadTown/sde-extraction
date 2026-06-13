@@ -15,6 +15,7 @@ Numbered so nothing gets dropped in restatement again. All are Liz's design.
 1. **Domain:** extract SDE epidemiological models from academic PDFs.
 2. **Figure-anchored / backward search:** figure (the anchor, a produced outcome) → model (drift+diffusion) → parameters → variables → initial conditions.
 3. **Figures-first:** detect + display ALL figures; user picks one **or** auto; the chosen figure's **panels = the variable checklist**.
+3a. **Single sub-figure granularity:** the choice must resolve to exactly ONE outcome — a single sub-figure/panel (e.g. "Figure 2, bottom-left"), NEVER a whole multi-panel page (a page may hold 6 separate diagrams). The picker/evaluator must let the user select a specific panel within a figure, and extraction targets that one. (Distinct from #3's panels-as-variables: those are the variables of ONE model plotted per panel; THIS is when a "figure" is actually several independent diagrams/outcomes and only one is the target.)
 4. **Present/absent canon:** every slot present (verbatim quote + page) or absent (not_stated | requires_inference). Never hallucinate; absence is valid.
 5. **ORCHESTRATOR** (named): a single coordinator runs the stages in a fixed, explicit order — no autonomous LLM planner.
 6. **Explicit stage ORDER:** figure-detect → figure-read (checklist) → **one extractor sub-agent PER variable** (fan-out) → reconcile (script) → locate (script) → verify (2nd model) → store (staging).
