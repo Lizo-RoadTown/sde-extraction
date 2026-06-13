@@ -12,6 +12,14 @@ export interface DetectedFigure {
   caption: string; // the text following the label (best-effort — the longest occurrence)
   page: number;
   thumb?: string;  // a rendered image of the figure's page (data URL) — the ACTUAL figure, not words
+  subfigures?: string[]; // sub-panel labels parsed from the caption (e.g. ["a","b","c"]) — the anchor must be ONE
+}
+
+// Sub-panel labels in a caption: "(a) … (b) …". Best-effort; the human refines/overrides with free text.
+function parseSubfigures(caption: string): string[] {
+  const found = new Set<string>();
+  for (const m of caption.matchAll(/\(([a-h])\)/gi)) found.add(m[1].toLowerCase());
+  return Array.from(found).sort();
 }
 
 export async function detectFigures(file: File): Promise<DetectedFigure[]> {
@@ -67,6 +75,7 @@ export async function detectFigures(file: File): Promise<DetectedFigure[]> {
       } catch { /* no thumb for this page */ }
     }
     f.thumb = thumbByPage.get(f.page);
+    f.subfigures = parseSubfigures(f.caption);
   }
   return figs;
 }

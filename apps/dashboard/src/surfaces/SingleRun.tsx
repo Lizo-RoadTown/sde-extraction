@@ -45,6 +45,7 @@ export function SingleRun() {
   const [figures, setFigures] = useState<DetectedFigure[]>([]);
   const [detecting, setDetecting] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null); // a figure label, or AUTO
+  const [subfig, setSubfig] = useState(""); // the SINGLE sub-figure/panel that is the anchor (e.g. "bottom-left", "b")
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -57,7 +58,7 @@ export function SingleRun() {
       const paper = await uploadPaper(file);
       setUpload({ kind: "done", paper });
       // Stage 1: detect + display the figures (deterministic, no LLM) so the user can choose.
-      setDetecting(true); setFigures([]); setChosen(null);
+      setDetecting(true); setFigures([]); setChosen(null); setSubfig("");
       try { setFigures(await detectFigures(file)); } catch { /* leave empty → auto */ }
       finally { setDetecting(false); }
     } catch (e) {
@@ -67,13 +68,20 @@ export function SingleRun() {
 
   const paperId = upload.kind === "done" ? upload.paper.paperId : null;
 
+  // The anchor is ONE graphic: the chosen figure, narrowed to a single sub-figure/panel when given.
+  const chosenFig = figures.find((f) => f.label === chosen) ?? null;
+  const anchor = chosen && chosen !== AUTO
+    ? (subfig.trim() ? `${chosen} (${subfig.trim()})` : chosen)
+    : null;
+
   async function startExtraction() {
     if (!paperId || !chosen) return;
     const auto = chosen === AUTO;
+    const ref = anchor ?? chosen;
     const target: JobTarget = auto
       ? { mode: "auto", lane: "walkthrough" }
-      : { mode: "figure", figure_ref: chosen, lane: "walkthrough" };
-    const label = auto ? "(auto)" : chosen;
+      : { mode: "figure", figure_ref: ref, lane: "walkthrough" };
+    const label = auto ? "(auto)" : ref;
     const jobId = await enqueueJob(paperId, label, target);
     if (!jobId) { setPhase({ kind: "failed", message: "Couldn't queue the job — are you signed in?" }); return; }
     setPhase({ kind: "running", jobId, paperId, stage: "queued" });
@@ -82,7 +90,7 @@ export function SingleRun() {
   function reset() {
     setPhase({ kind: "compose" });
     setUpload({ kind: "idle" });
-    setFigures([]); setChosen(null);
+    setFigures([]); setChosen(null); setSubfig("");
   }
 
   const runningJobId = phase.kind === "running" ? phase.jobId : null;
@@ -195,10 +203,35 @@ export function SingleRun() {
                     </button>
                   ))
                 )}
+                {/* anchor on ONE graphic — narrow a multi-panel figure to a single sub-figure */}
+                {chosen && chosen !== AUTO && (
+                  <div className="rounded-md border border-active-edge/50 bg-active-soft/20 px-3 py-2">
+                    <div className="mb-1 text-[11px] text-ink-dim">
+                      Anchor on <span className="text-ink">one</span> graphic — if {chosen} is a multi-panel page, name the single panel:
+                    </div>
+                    {chosenFig?.subfigures?.length ? (
+                      <div className="mb-1.5 flex flex-wrap gap-1">
+                        {chosenFig.subfigures.map((s) => (
+                          <button type="button" key={s} onClick={() => setSubfig(subfig === s ? "" : s)}
+                            className={cx("rounded px-2 py-0.5 text-[11px] transition",
+                              subfig === s ? "bg-active-soft text-active" : "bg-surface-raised text-ink-dim hover:text-ink")}>
+                            ({s})
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <input value={subfig} onChange={(e) => setSubfig(e.target.value)}
+                      placeholder="e.g. bottom-left · panel (b) · the σ=3.9 plot"
+                      className="w-full rounded-md border border-edge bg-surface-raised/40 px-2 py-1 text-xs text-ink placeholder:text-ink-faint focus-visible:outline focus-visible:outline-2 focus-visible:outline-active" />
+                    <div className="mt-1 text-[10px] text-ink-faint">
+                      anchor: <span className="text-ink-dim">{anchor}</span>{!subfig.trim() && " — whole figure (leave blank only if it’s a single model)"}
+                    </div>
+                  </div>
+                )}
                 <button type="button" onClick={startExtraction} disabled={!paperId || !chosen}
                   title={!chosen ? "Choose a figure or Auto-detect" : undefined}
                   className="mt-2 w-full rounded-md bg-active-soft py-2 text-sm text-active transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-                  Extract {chosen && chosen !== AUTO ? chosen : ""} →
+                  Extract {anchor ?? ""} →
                 </button>
               </div>
             )}
