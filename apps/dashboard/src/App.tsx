@@ -3,6 +3,8 @@ import { Queue } from "./surfaces/Queue";
 import { Library } from "./surfaces/Library";
 import { ExtractionHealth } from "./surfaces/ExtractionHealth";
 import { VerifyPage } from "./surfaces/VerifyPage";
+import { FingerprintJourney } from "./surfaces/FingerprintJourney";
+import { SAMPLE_EXTRACTION } from "./preview";
 import { cx } from "./ui";
 import { AuthGate } from "./auth";
 import { usePreview, setPreview } from "./usePreview";
@@ -28,6 +30,7 @@ function CurrentView({ route }: { route: string }) {
   if (route === "/queue") return <Queue />;
   if (route === "/library") return <Library />;
   if (route === "/health") return <ExtractionHealth />;
+  if (route === "/fingerprint") return <FingerprintJourney ext={SAMPLE_EXTRACTION} />; // aesthetic sandbox
   return <SingleRun />; // "/" and any unknown route
 }
 
