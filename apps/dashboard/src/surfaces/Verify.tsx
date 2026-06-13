@@ -90,6 +90,50 @@ function SlotRow({
   );
 }
 
+// The MODEL — the actual SDE behind the figure, assembled from the extracted drift
+// (deterministic) + diffusion (noise) terms. This is what the parameters belong to; without
+// it the numbers float. dV = (drift) dt + (diffusion) dW, per variable.
+function ModelView({ ext }: { ext: FigureExtraction }) {
+  const vars = Array.from(new Set([
+    ...ext.driftTerms.map((t) => t.variable),
+    ...ext.diffusionTerms.map((t) => t.variable),
+  ])).filter(Boolean);
+  const exprVal = (s: Slot) => (s.status === "present" ? s.value : null);
+
+  return (
+    <Card className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-ink">The model — the SDE behind {ext.figureLabel}</span>
+        <Badge tone="cyan">drift + diffusion</Badge>
+      </div>
+      {vars.length === 0 ? (
+        <div className="rounded-md border border-dashed border-edge px-3 py-4 text-center text-xs text-ink-faint">
+          No drift/diffusion terms were captured — the model behind this figure wasn’t extracted. The parameters below have nothing to belong to yet.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {vars.map((v) => {
+            const drift = ext.driftTerms.filter((t) => t.variable === v).map((t) => exprVal(t.expression)).filter(Boolean) as string[];
+            const diff = ext.diffusionTerms.filter((t) => t.variable === v).map((t) => exprVal(t.expression)).filter(Boolean) as string[];
+            return (
+              <div key={v} className="rounded-md bg-inset px-3 py-2">
+                <span className="mono text-sm text-ink">
+                  d{v} = {drift.length ? <>({drift.join(" + ")}) dt</> : <span className="text-ink-faint">(drift absent)</span>}
+                  {diff.length ? <span className="text-active"> + ({diff.join(" + ")}) dW</span> : null}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-[11px] text-ink-faint">
+        The stochastic model the engine identified as the one that produced <span className="text-ink-dim">{ext.figureLabel}</span> —
+        built from the drift + diffusion terms it extracted. Each term traces to a quote in the paper (the table below); the parameters are this model’s constants.
+      </p>
+    </Card>
+  );
+}
+
 // `walkthrough` = the guided front-page experience (undergrads / skeptics): show the
 // cinematic spotlight search. The power-user lane (bulk queue) leaves it off — PhDs verify
 // fast and don't need the walkthrough.
@@ -159,6 +203,9 @@ export function Detail({ ext, walkthrough = false, onResolved }: { ext: FigureEx
           is what it <span className="text-ink-dim">required</span> to be produced, searched backward from it and confirmed present or absent.
         </p>
       </Card>
+
+      {/* the MODEL — the SDE the figure required; what the parameters belong to */}
+      <ModelView ext={ext} />
 
       {/* the lineage made visible: the cinematic spotlight search — guided lane only */}
       {walkthrough && <SpotlightQuest ext={ext} />}
