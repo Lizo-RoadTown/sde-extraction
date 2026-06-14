@@ -31,21 +31,30 @@ from pydantic import BaseModel
 
 Provenance = Literal["corpus-confirmed", "prior-art-candidate"]
 
+# Allen's primary organizing axis (Allen 2017, Infect. Dis. Model. 2(2):128-142, p.128):
+# DEMOGRAPHIC variability = internal, from discrete transmission/recovery/birth/death events;
+# ENVIRONMENTAL variability = external, parameters fluctuate with conditions. "either" = a
+# structural family that can carry either source (e.g. a generic Brownian or jump term).
+NoiseSource = Literal["demographic", "environmental", "either"]
+
 
 class FormulationFamily(BaseModel):
     """One way stochasticity enters an SDE epidemic model — a category, not a value.
 
     `recognized_by` are the cues the classifier looks for; `how_noise_enters` is the structural
-    signature; `seen_in` anchors the family to real ground-truth papers (the determinism web:
-    every category is traceable, not invented).
+    signature; `noise_source` is Allen's demographic/environmental axis; `seen_in` anchors the
+    family to real ground-truth papers and `citation` to the verifying literature (the determinism
+    web: every category is traceable, not invented).
     """
 
     name: str                         # the match key, e.g. "ornstein-uhlenbeck-parameter"
     label: str                        # human label, e.g. "Ornstein–Uhlenbeck parameter process"
     how_noise_enters: str             # the structural signature
+    noise_source: NoiseSource         # Allen's axis: demographic | environmental | either
     recognized_by: str                # cues in equations/prose the classifier keys on
     provenance: Provenance
     literature_verified: bool = False  # has a primary citation been attached + confirmed?
+    citation: str = ""                # the verifying primary source (see research/findings)
     seen_in: list[str] = []           # ground-truth examples (AT3 completed reviews)
 
 
@@ -57,40 +66,55 @@ FORMULATION_FAMILIES: list[FormulationFamily] = [
         name="white-noise-brownian",
         label="White-noise / Brownian (Wiener) perturbation",
         how_noise_enters="a Wiener increment dB(t) added to rate(s): dX = drift·dt + diffusion·dB",
+        noise_source="either",
         recognized_by="dB(t)/dW(t) terms, 'standard Brownian motion', 'white noise', no naming of a parameter process",
         provenance="corpus-confirmed",
+        literature_verified=True,
+        citation="Allen 2017, Infect. Dis. Model. 2(2):128-142, §4 (SDE from a diffusion process)",
         seen_in=["Witbooi_Malaria", "(default for papers that write dB without naming a family)"],
     ),
     FormulationFamily(
         name="environmental-parametric-noise",
         label="Environmental / parametric (multiplicative) noise",
         how_noise_enters="a rate fluctuates: a parameter (often β) carries multiplicative noise, e.g. β -> β + σ·dB",
-        recognized_by="noise attached to a transmission/contact rate; 'environmental fluctuation'; multiplicative σ·X·dB",
+        noise_source="environmental",
+        recognized_by="noise attached to a transmission/contact rate; 'environmental fluctuation/variability'; multiplicative σ·X·dB",
         provenance="prior-art-candidate",
+        literature_verified=True,
+        citation="Allen 2017, §1 + final section (environmental variability; fluctuating rates)",
         seen_in=[],
     ),
     FormulationFamily(
         name="demographic-noise-cle",
         label="Demographic noise / Chemical Langevin (diffusion approximation)",
         how_noise_enters="drift = the ODE; diffusion from event-rate covariance (CTMC -> SDE limit); scales ~1/sqrt(N)",
+        noise_source="demographic",
         recognized_by="per-event √rate diffusion terms; 'diffusion approximation'; 'chemical Langevin'; population-size scaling",
         provenance="prior-art-candidate",
+        literature_verified=True,
+        citation="Allen 2017, §4 (ΔX ≈ Normal(0, CV); drift=ODE, diffusion=√covariance); Gillespie 2000, J. Chem. Phys. 113:297 (chemical Langevin)",
         seen_in=[],
     ),
     FormulationFamily(
         name="ornstein-uhlenbeck-parameter",
         label="Ornstein–Uhlenbeck parameter process",
         how_noise_enters="a parameter mean-reverts stochastically: dx = θ(x̄ − x)dt + σ·dB, then feeds a rate",
+        noise_source="environmental",
         recognized_by="mean-reversion θ(x̄−x); an auxiliary log-process variable; 'Ornstein–Uhlenbeck'",
         provenance="corpus-confirmed",
+        literature_verified=True,
+        citation="Allen 2017, final section (environmental variability as mean-reverting); Wang et al. 2024, Sci. Rep. 14, s41598-024-52335-6 (mean-reverting OU epidemic model)",
         seen_in=["Dengue Infection OrnsteinUhlenbeck", "10_1007s00332.023_copy"],
     ),
     FormulationFamily(
         name="levy-jump",
         label="Lévy / jump noise",
         how_noise_enters="discontinuous jumps via a Lévy/Poisson term in addition to (or instead of) Brownian diffusion",
+        noise_source="environmental",
         recognized_by="jump/Poisson integral terms, 'Lévy', compensated jumps, 'jump-diffusion'",
         provenance="corpus-confirmed",
+        literature_verified=True,
+        citation="Zhou et al. 2020, Adv. Differ. Equ. 2020:170, s13662-020-2521-6 (SIR Lévy jump); NOT in Allen 2017 (she restricts to CTMC + diffusion SDE)",
         seen_in=["Cholera", "Viral Infection", "Dengue Infection OrnsteinUhlenbeck"],
     ),
 ]
@@ -188,7 +212,7 @@ def registry_reference() -> str:
     prompt and the registry never drift. 'so the agent knows what everything is.'"""
     lines = ["Known stochastic-model families (match one, or propose a new name if none fit):"]
     for f in FORMULATION_FAMILIES:
-        lines.append(f"- {f.name} — {f.label}: {f.how_noise_enters}. Recognize by: {f.recognized_by}.")
+        lines.append(f"- {f.name} — {f.label} [{f.noise_source} noise]: {f.how_noise_enters}. Recognize by: {f.recognized_by}.")
     lines.append("Transformations (list any that apply, or propose new):")
     for t in TRANSFORMATIONS:
         lines.append(f"- {t.name} — {t.label}. Recognize by: {t.recognized_by}.")
