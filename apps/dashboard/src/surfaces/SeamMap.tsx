@@ -10,6 +10,11 @@ import { loadSeamTelemetry, loadValidationHealth, type SeamStat, type Validation
 
 type Coupling = "move" | "fanout" | "enrich" | "merge" | "check" | "audit" | "gate";
 
+// The V1–V8 validation gates are GOVERNANCE that attaches AT THE SEAMS (not a separate diagram).
+// Each gate rides the seam where its check happens; states are honest (live data vs designed).
+type GateState = "live" | "partial" | "designed" | "conditional";
+interface Gate { id: string; name: string; who: "machine" | "human"; state: GateState }
+
 interface SeamDef {
   id: string;
   name: string;
@@ -18,27 +23,32 @@ interface SeamDef {
   to: string;     // drawer below
   point?: string; // validation_events.point key (real telemetry) if emitted
   planned?: boolean;
+  gate?: Gate;    // the V-gate that governs this seam (folded in from the old V1–V8 chain)
   note: string;
 }
 
 // Top → bottom: intake converges at the queue, then the pipeline descends to the Library.
 const SEAMS: SeamDef[] = [
-  { id: "S1", name: "store PDF", coupling: "move", from: "Source · uploaded PDF", to: "File store", note: "bytes → papers (file_sha256). Same form, drawer→drawer." },
-  { id: "S1b", name: "fetch snapshot", coupling: "move", from: "Source · DOI", to: "File store", planned: true, note: "publisher → retained snapshot (V1–V4). Planned — a second intake origin." },
-  { id: "S2", name: "enqueue", coupling: "move", from: "File store", to: "Job queue", note: "intake choice → a command (target: lane/mode/figure). All intakes converge here." },
-  { id: "S3", name: "extract", coupling: "fanout", from: "Job queue", to: "Extractor (LLM)", point: "extract", note: "ONE PDF → many present/absent slots, a NEW form. The richest seam." },
-  { id: "S4", name: "locate", coupling: "enrich", from: "Extractor (LLM)", to: "Located slots", point: "locate", note: "each quote pinned on the PDF + verbatim-verified (confidence tiers)." },
+  { id: "S1", name: "store PDF", coupling: "move", from: "Source · uploaded PDF", to: "File store", gate: { id: "V3", name: "snapshot intact", who: "machine", state: "designed" }, note: "bytes → papers (file_sha256). Same form, drawer→drawer." },
+  { id: "S1b", name: "fetch snapshot", coupling: "move", from: "Source · DOI", to: "File store", planned: true, gate: { id: "V1–V2", name: "DOI resolves · licence", who: "machine", state: "designed" }, note: "publisher → retained snapshot. Planned — a second intake origin." },
+  { id: "S2", name: "enqueue", coupling: "move", from: "File store", to: "Job queue", gate: { id: "V4", name: "text derived", who: "machine", state: "designed" }, note: "intake choice → a command (target: lane/mode/figure). All intakes converge here." },
+  { id: "S3", name: "extract", coupling: "fanout", from: "Job queue", to: "Extractor (LLM)", point: "extract", gate: { id: "V5", name: "schema valid", who: "machine", state: "live" }, note: "ONE PDF → many present/absent slots, a NEW form. The richest seam." },
+  { id: "S4", name: "locate", coupling: "enrich", from: "Extractor (LLM)", to: "Located slots", point: "locate", gate: { id: "V6", name: "lineage re-hashes", who: "machine", state: "partial" }, note: "each quote pinned on the PDF + verbatim-verified (confidence tiers)." },
   { id: "S5", name: "reconcile", coupling: "merge", from: "Located slots", to: "Assembled model", note: "dedup shared params (β, σ…) into the system set." },
   { id: "S6", name: "cross-check", coupling: "check", from: "Assembled model", to: "Checked model", note: "captured vars vs figure panels → completeness gate." },
-  { id: "S7", name: "verify", coupling: "audit", from: "Checked model", to: "Verified-by-machine", note: "2nd model audits each slot before storage." },
+  { id: "S7", name: "verify", coupling: "audit", from: "Checked model", to: "Verified-by-machine", gate: { id: "V7", name: "figure reproduced", who: "machine", state: "conditional" }, note: "2nd model audits each slot; the diffrax oracle regenerates the figure." },
   { id: "S8", name: "store", coupling: "move", from: "Verified-by-machine", to: "Database (staging)", point: "store", note: "store it ALL — model + lineage + verdict." },
-  { id: "S9", name: "human verdict (V8)", coupling: "gate", from: "Database (staging)", to: "Human / review", note: "approve promotes to verified. The human gate." },
+  { id: "S9", name: "human verdict", coupling: "gate", from: "Database (staging)", to: "Human / review", gate: { id: "V8", name: "human verdict", who: "human", state: "live" }, note: "approve promotes to verified. The human gate." },
   { id: "S10", name: "promote", coupling: "move", from: "Human / review", to: "Library", note: "verified models → searchable Library." },
 ];
 
 const COUPLING_LABEL: Record<Coupling, string> = {
   move: "move · 1→1", fanout: "transform · 1→many", enrich: "enrich", merge: "merge · N→1",
   check: "check", audit: "audit", gate: "human gate",
+};
+
+const GATE_DOT: Record<GateState, string> = {
+  live: "bg-present", partial: "bg-attention", designed: "bg-ink-faint", conditional: "bg-ink-faint",
 };
 
 function outcomeTone(s?: SeamStat): { dot: string; line: string } {
@@ -129,9 +139,23 @@ export function SeamMap() {
       <p className="mt-2 text-[11px] text-ink-faint">
         Telemetry richness follows coupling: a <span className="text-ink-dim">move</span> (1→1) shows little; the
         <span className="text-ink-dim"> transform/fan-out</span> at <span className="mono">extract</span> (one PDF → many pieces) carries the most.
+        The <span className="text-ink-dim">V-gates</span> (V1–V8) are governance riding each seam —
+        <span className="mono"> ●</span> live · <span className="text-attention">●</span> partial · <span className="text-ink-faint">●</span> designed.
         Real counts come from <span className="mono">validation_events</span>; “no telemetry yet” is honest, not hidden.
       </p>
     </Card>
+  );
+}
+
+// A V-gate folded onto its seam (governance at the seam, not a separate diagram). Human gate = teal.
+function GateChip({ gate }: { gate: Gate }) {
+  return (
+    <span className={cx("inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px]",
+      gate.who === "human" ? "bg-active-soft text-active" : "bg-inset text-ink-faint")}
+      title={`${gate.id} ${gate.name} · ${gate.who} · ${gate.state}`}>
+      <span className={cx("h-1 w-1 rounded-full", GATE_DOT[gate.state])} />
+      {gate.id} {gate.name}
+    </span>
   );
 }
 
@@ -179,6 +203,7 @@ function SeamRow({ seam, telemetry, tone, animate }: {
             <span className="mono text-[10px] text-ink-faint">{seam.id}</span>
             <span className="text-xs font-medium text-ink">{seam.name}</span>
             <span className={cx("rounded px-1.5 py-0.5 text-[9px]", isFanout ? "bg-active-soft text-active" : "bg-surface-raised text-ink-faint")}>{COUPLING_LABEL[seam.coupling]}</span>
+            {seam.gate && <GateChip gate={seam.gate} />}
           </div>
           <div className="truncate text-[10px] text-ink-faint">{seam.note}</div>
         </div>
