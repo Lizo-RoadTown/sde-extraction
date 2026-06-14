@@ -1,0 +1,7 @@
+# Dependencies for the nv-ingest evaluation spike ONLY (scripts/spike_nvingest.py).
+# DO NOT add these to services/extraction/requirements.txt — the worker image stays lean and
+# OpenAI-only. This is dev-tooling for a one-off "is nv-ingest a better figure detector?" probe.
+#
+# Hosted-NIM path (no local GPU). If a later step needs local inference, add the [local] extra.
+nemo-retriever
+pandas
