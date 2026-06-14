@@ -42,7 +42,13 @@ which is accepted. The `status` literal still distinguishes the two members.
 
 ## The extracted model
 
-One `(paper, figure)` extraction. Each field below is a `Slot` unless noted.
+One `(paper, figure)` extraction, where **figure is one sub-figure** — a single graphic, not a
+multi-panel page (see [Targeting](/reference/targeting/)). That one graphic's panels form the
+**variable checklist**: the extractor must account for every panel, and a cross-check reports
+any captured-vs-panels gap before the result is stored (the completeness gate, S6 on the
+[seam map](/explanation/observability/)).
+
+Each field below is a `Slot` unless noted.
 
 | Field | Type | Holds |
 |---|---|---|

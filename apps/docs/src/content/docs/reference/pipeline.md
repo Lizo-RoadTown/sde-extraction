@@ -28,8 +28,13 @@ stateDiagram-v2
 A job is claimed **atomically** so two workers never process the same one
 (`UPDATE … FOR UPDATE SKIP LOCKED`). The worker then, for each job: marks it `extract`,
 downloads the paper PDF, runs the extractor honoring the [targeting mode](/reference/targeting/),
-writes the present/absent result with its lineage hashes to `extractions` (status
-`needs_human`), and marks the job `stored`. An error marks the job `failed` with the message.
+locates each quote on the PDF, writes the present/absent result with its lineage hashes to
+`extractions` (status `needs_human`, on the job's [`lane`](/reference/database/)), and marks
+the job `stored`. An error marks the job `failed` with the message.
+
+As it crosses each boundary it emits a **seam telemetry** row to `validation_events` — at
+`extract` (the fan-out: PDF → many slots), `locate` (quotes pinned on the PDF), and `store`.
+That is what the [Extraction Health seam map](/explanation/observability/) renders.
 
 ## Run modes
 
@@ -43,12 +48,18 @@ The `--dry-run` path lets the entire pipeline — claim, write, status transitio
 against a real database without spending model calls. With no database configured the worker
 idles gracefully rather than failing.
 
-## What is verified vs not
+## What runs today vs what's next
 
-The worker loop, the atomic claim, the database writes, and the Docker container are
-**verified** (the dry-run path has been run end-to-end against the live database). A **real
-extraction against a live paper** has **not yet been run** — the schema is correct and the
-call reaches OpenAI, but a billing quota currently blocks the model call. See
-[How-to → Run the extraction worker](/how-to/run-worker/).
+The worker loop, the atomic claim, the database writes, the Docker container, **and real
+extractions against live papers** are running — results land in `extractions` for review, on
+their lane, with seam telemetry emitted. The current brain is a single OpenAI structured-output
+call (`processor.py` `run`) plus a deterministic locator pass.
 
-*Source: `services/extraction/worker.py`, `processor.py`, `db.py`.*
+The **next iteration** decomposes the extractor into a near-decomposable graph (one subagent
+per figure-panel variable, a second-model verifier before storage, and a staging table), with a
+LangGraph checkpointer for crash-resume — see
+[`docs/proposals/2026-06-12-command-driven-hooked-pipeline.md`](https://github.com/Lizo-RoadTown/SDE_Extraction)
+and the revisited [ADR 0001](/decisions/0001-openai-pydantic-over-langgraph/). It is not yet
+deployed; the `extract` seam stays a single hop until it lands.
+
+*Source: `services/extraction/worker.py`, `processor.py`, `db.py`, `locator.py`, `hooks.py`.*
