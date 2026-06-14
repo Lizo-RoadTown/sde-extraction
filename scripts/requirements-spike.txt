@@ -1,7 +1,11 @@
 # Dependencies for the nv-ingest evaluation spike ONLY (scripts/spike_nvingest.py).
 # DO NOT add these to services/extraction/requirements.txt — the worker image stays lean and
-# OpenAI-only. This is dev-tooling for a one-off "is nv-ingest a better figure detector?" probe.
+# OpenAI-only. This is dev-tooling for a "is NVIDIA's page-elements detector better at finding
+# figure panels?" probe.
 #
-# Hosted-NIM path (no local GPU). If a later step needs local inference, add the [local] extra.
-nemo-retriever
-pandas
+# Light, Python-3.13-friendly path: we call the hosted page-elements NIM directly over HTTP and
+# rasterize PDF pages ourselves. (The full `nemo-retriever` package is NOT used — it needs
+# Python 3.12 and ray, which has no Windows wheel.)
+PyMuPDF      # rasterize PDF pages -> images (import name: fitz)
+Pillow       # JPEG encode + draw detection boxes
+requests     # POST to the NIM endpoint

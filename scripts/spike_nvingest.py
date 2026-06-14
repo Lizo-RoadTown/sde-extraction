@@ -1,141 +1,204 @@
 #!/usr/bin/env python3
-"""SPIKE (dev-tooling, NOT runtime): does nv-ingest detect figure panels better than us?
+"""SPIKE (dev-tooling, NOT runtime): does the NVIDIA page-elements detector separate panels?
 
-This is an evaluation probe, not part of the worker. It runs NVIDIA NeMo Retriever
-(nv-ingest) in DETECTION-ONLY mode against one PDF and prints the element inventory it
-finds — text / table / chart / image / infographic, per page. The question it answers:
+Direct REST call to the hosted page-elements NIM — NO nemo-retriever package, NO ray (which
+won't install on this Python 3.13 / Windows box). We rasterize each PDF page to an image
+ourselves (PyMuPDF) and POST it to the detector, which returns layout regions with bounding
+boxes: title / paragraph / table / chart / header_footer.
 
-    "Does nv-ingest cleanly separate a multi-panel figure into its panels?"
+The question it answers: on the figure's page, does the detector return EACH panel as its own
+'chart' box, or lump the multi-panel figure into one? That's the 'captured 3 of 5 panels'
+problem (our caption-regex detector, apps/dashboard/src/figures.ts, does it weakly).
 
-That is the exact thing our caption-regex detector (apps/dashboard/src/figures.ts) does
-weakly — the source of the 'captured 3 of 5 panels' problem. If nv-ingest gives a clean
-per-panel inventory, it's worth adopting AS A DETECTOR ONLY: it would feed the figure-panel
-checklist (FigureRead.panels, S6), while OpenAI + Pydantic stays the extraction brain
-(processor.py). We use NONE of nv-ingest's embedding / vector-DB / LLM layers.
-
-Boundaries this honors:
-  - OpenAI + Pydantic remains the brain (memory: openai-pydantic-is-the-brain).
-  - nemo-retriever is a SEPARATE install (scripts/requirements-spike.txt) — it never touches
-    the worker image / services/extraction/requirements.txt.
-  - The default input PDF lives in AT3_review/ (read-only reference) — we only READ it.
-  - Hosted NIMs: needs NVIDIA_API_KEY in the env. We never store or print the key.
+Boundaries (unchanged):
+  - Detector ONLY. No embedding, no vector DB, no LLM. OpenAI + Pydantic stays the brain
+    (services/extraction/processor.py). If this wins, it feeds FigureRead.panels (seam S6) and
+    its bounding boxes could also strengthen the locator.
+  - Rasterizing (render page -> image) is the robust front-end: the model sees what a human
+    sees. Reusable for the OpenAI brain too (cropped sub-figure image -> OpenAI vision).
+  - Reads the read-only AT3_review ground-truth PDF; never modifies it.
+  - Needs the NVIDIA key (NVIDIA_API_KEY or the alias NVIDIA_KEY, incl. from .env). Never printed.
 
 Usage:
     pip install -r scripts/requirements-spike.txt
-    export NVIDIA_API_KEY=nvapi-...          # PowerShell: $env:NVIDIA_API_KEY = "nvapi-..."
-    python scripts/spike_nvingest.py [path/to.pdf]
+    python scripts/spike_nvingest.py [path/to.pdf] [--page N]   # default: all pages, capped
 
-Safe to run before you have the key — it explains what's missing and exits 0.
+Annotated images (boxes drawn) are written to scripts/out/ so you can SEE the detection.
 """
 from __future__ import annotations
 
+import base64
+import io
 import os
 import sys
 from collections import Counter
 from pathlib import Path
 
-# Hosted NIM endpoints (build.nvidia.com) — remote inference, no local GPU. Overridable by env
-# in case NVIDIA bumps versions.
-PAGE_ELEMENTS_URL = os.environ.get(
+ENDPOINT = os.environ.get(
     "NVI_PAGE_ELEMENTS_URL", "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-page-elements-v3")
-OCR_URL = os.environ.get(
-    "NVI_OCR_URL", "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v1")
-TABLE_STRUCTURE_URL = os.environ.get(
-    "NVI_TABLE_STRUCTURE_URL", "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-table-structure-v1")
+# Inline base64 has a request-size ceiling on ai.api.nvidia.com (~180 KB of image). We JPEG-encode
+# and downscale to fit; above that NVIDIA requires their asset-upload API (not done in this spike).
+MAX_IMAGE_BYTES = int(os.environ.get("NVI_MAX_IMAGE_BYTES", "180000"))
+PAGE_CAP = int(os.environ.get("NVI_PAGE_CAP", "16"))  # don't fire unlimited API calls by accident
+OUT_DIR = Path("scripts/out")
 
-# run_mode: "inprocess" runs the orchestration locally while calling the hosted NIMs for the
-# models — the lightest path with no nv-ingest service to stand up. If this errors, try
-# NVI_RUN_MODE=batch or =service (a gateway). Discovering the right one is part of the spike.
-RUN_MODE = os.environ.get("NVI_RUN_MODE", "inprocess")
-
-# Default to the one real ground-truth PDF we have (read-only reference; we only read it).
 DEFAULT_PDF = Path(
     "AT3_review/reviews/completed/10_1007s00332.023_copy/Dengue Infection OrnsteinUhlenbeck.pdf")
 
 
+def _load_key() -> None:
+    """Make NVIDIA_API_KEY available from env or .env. Accepts the alias NVIDIA_KEY.
+    Only ever reads/sets the NVIDIA key — never loads or echoes other secrets."""
+    if os.environ.get("NVIDIA_API_KEY"):
+        return
+    if os.environ.get("NVIDIA_KEY"):
+        os.environ["NVIDIA_API_KEY"] = os.environ["NVIDIA_KEY"]
+        return
+    for env_path in (Path(".env"), Path("services/extraction/.env")):
+        if not env_path.exists():
+            continue
+        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = line.strip()
+            if line.startswith(("NVIDIA_API_KEY=", "NVIDIA_KEY=")):
+                val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if val:
+                    os.environ["NVIDIA_API_KEY"] = val
+                    return
+
+
 def _preflight(pdf: Path) -> str | None:
-    """Return an error string if we can't run, else None."""
+    _load_key()
     if not os.environ.get("NVIDIA_API_KEY"):
-        return ("NVIDIA_API_KEY is not set. Get a key at build.nvidia.com, then:\n"
-                "    PowerShell:  $env:NVIDIA_API_KEY = \"nvapi-...\"\n"
-                "    bash:        export NVIDIA_API_KEY=nvapi-...")
+        return ("NVIDIA key not set. Put NVIDIA_KEY=nvapi-... in .env, or:\n"
+                "    PowerShell:  $env:NVIDIA_API_KEY = \"nvapi-...\"")
     if not pdf.exists():
-        return f"PDF not found: {pdf}\nPass a path: python scripts/spike_nvingest.py path/to.pdf"
-    try:
-        import nemo_retriever  # noqa: F401
-    except ImportError:
-        return ("nemo-retriever is not installed (it's a separate dev dependency, NOT in the "
-                "worker image). Install it:\n    pip install -r scripts/requirements-spike.txt")
+        return f"PDF not found: {pdf}"
+    for mod in ("fitz", "requests", "PIL"):
+        try:
+            __import__(mod)
+        except ImportError:
+            return ("missing dependency — install the spike deps:\n"
+                    "    pip install -r scripts/requirements-spike.txt")
     return None
 
 
-def run(pdf: Path) -> int:
-    from nemo_retriever import create_ingestor
+def rasterize(pdf: Path, page_index: int) -> tuple[bytes, int, int]:
+    """Render one PDF page to JPEG bytes, downscaling/quality-reducing to fit MAX_IMAGE_BYTES.
+    Returns (jpeg_bytes, width, height)."""
+    import fitz  # PyMuPDF
+    from PIL import Image
 
-    print(f"nv-ingest spike · run_mode={RUN_MODE} · {pdf.name}")
-    print("detection only — no embedding, no vector DB, no LLM. OpenAI stays the brain.\n")
+    doc = fitz.open(pdf)
+    try:
+        page = doc[page_index]
+        for dpi in (200, 150, 110, 80):  # step down until the encoded image fits
+            pix = page.get_pixmap(dpi=dpi)
+            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            for quality in (85, 70, 55):
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=quality)
+                data = buf.getvalue()
+                if len(data) <= MAX_IMAGE_BYTES:
+                    return data, pix.width, pix.height
+        # smallest attempt, even if over budget (the POST may then 413 — we report it)
+        return data, pix.width, pix.height
+    finally:
+        doc.close()
 
-    ingestor = create_ingestor(run_mode=RUN_MODE)
-    ingestor = ingestor.files([str(pdf)]).extract(
-        extract_text=True,
-        extract_tables=True,
-        extract_charts=True,
-        extract_infographics=True,
-        page_elements_invoke_url=PAGE_ELEMENTS_URL,
-        ocr_invoke_url=OCR_URL,
-        table_structure_invoke_url=TABLE_STRUCTURE_URL,
+
+def detect(jpeg: bytes) -> dict:
+    """POST one image to the page-elements NIM, return parsed JSON."""
+    import requests
+
+    b64 = base64.b64encode(jpeg).decode()
+    resp = requests.post(
+        ENDPOINT,
+        headers={"Authorization": f"Bearer {os.environ['NVIDIA_API_KEY']}",
+                 "Accept": "application/json"},
+        json={"input": [{"type": "image_url", "url": f"data:image/jpeg;base64,{b64}"}]},
+        timeout=120,
     )
+    resp.raise_for_status()
+    return resp.json()
 
-    chunks = ingestor.ingest()  # pandas.DataFrame, one row per detected element
 
-    # The DataFrame schema can vary by version; pull fields defensively.
-    rows = chunks.to_dict("records") if hasattr(chunks, "to_dict") else list(chunks)
-    print(f"detected {len(rows)} elements\n")
+def boxes_from(response: dict) -> dict[str, list[dict]]:
+    """Pull {class: [box,...]} out of the response, tolerant of schema shape."""
+    data = response.get("data") or []
+    if not data:
+        return {}
+    bb = (data[0] or {}).get("bounding_boxes") or {}
+    return {k: v for k, v in bb.items() if isinstance(v, list)}
 
-    def field(r: dict, *names: str):
-        for n in names:
-            if n in r and r[n] not in (None, ""):
-                return r[n]
-        md = r.get("metadata") or {}
-        cm = (md.get("content_metadata") or {}) if isinstance(md, dict) else {}
-        for n in names:
-            if isinstance(cm, dict) and cm.get(n) not in (None, ""):
-                return cm[n]
-        return None
 
-    by_type: Counter[str] = Counter()
-    by_page: Counter[int] = Counter()
-    print(f"{'#':>3}  {'page':>4}  {'type':<14}  preview")
-    print("-" * 78)
-    for i, r in enumerate(rows):
-        ctype = str(field(r, "content_type", "document_type") or "?")
-        page = field(r, "page_number", "page")
-        text = str(field(r, "text", "content") or "").replace("\n", " ")
-        by_type[ctype] += 1
-        if isinstance(page, int):
-            by_page[page] += 1
-        print(f"{i:>3}  {str(page):>4}  {ctype:<14}  {text[:48]}")
+def annotate(jpeg: bytes, boxes: dict[str, list[dict]], out_path: Path) -> None:
+    """Draw the detected boxes (normalized coords) on the image and save it."""
+    from PIL import Image, ImageDraw
 
-    print("\nby content_type:", dict(by_type))
-    print("by page:        ", dict(sorted(by_page.items())))
-    print("\nThe question to eyeball: are the figure's panels each a separate chart/image row,")
-    print("or lumped into one? Compare against the known ground-truth panels for this figure.")
+    img = Image.open(io.BytesIO(jpeg)).convert("RGB")
+    W, H = img.size
+    draw = ImageDraw.Draw(img)
+    palette = {"chart": (220, 50, 50), "table": (50, 120, 220), "title": (40, 160, 80),
+               "paragraph": (150, 150, 150), "header_footer": (200, 160, 40)}
+    for cls, items in boxes.items():
+        color = palette.get(cls, (255, 0, 255))
+        for b in items:
+            x0, y0 = b.get("x_min", 0) * W, b.get("y_min", 0) * H
+            x1, y1 = b.get("x_max", 0) * W, b.get("y_max", 0) * H
+            draw.rectangle([x0, y0, x1, y1], outline=color, width=3)
+            draw.text((x0 + 2, y0 + 2), cls, fill=color)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out_path)
+
+
+def run(pdf: Path, only_page: int | None) -> int:
+    import fitz
+
+    doc = fitz.open(pdf)
+    n_pages = doc.page_count
+    doc.close()
+
+    pages = [only_page] if only_page is not None else list(range(min(n_pages, PAGE_CAP)))
+    print(f"page-elements spike · {pdf.name} · {n_pages} pages, scanning {len(pages)}")
+    print("detector only — OpenAI stays the brain. Annotated images -> scripts/out/\n")
+
+    totals: Counter[str] = Counter()
+    for pidx in pages:
+        try:
+            jpeg, w, h = rasterize(pdf, pidx)
+            response = detect(jpeg)
+        except Exception as e:  # noqa: BLE001 — spike: report and continue
+            print(f"page {pidx + 1:>2}: ERROR {type(e).__name__}: {str(e)[:120]}")
+            continue
+        boxes = boxes_from(response)
+        counts = {cls: len(v) for cls, v in boxes.items() if v}
+        for cls, n in counts.items():
+            totals[cls] += n
+        out = OUT_DIR / f"{pdf.stem}.p{pidx + 1:02d}.jpg"
+        annotate(jpeg, boxes, out)
+        summary = ", ".join(f"{cls}:{n}" for cls, n in sorted(counts.items())) or "(nothing)"
+        print(f"page {pidx + 1:>2}: {summary}")
+
+    print(f"\ntotals across scanned pages: {dict(totals)}")
+    print("\nThe panel question: on the figure's page, is each panel its own 'chart' box,")
+    print("or one big 'chart'? Open the annotated scripts/out/*.jpg to see the boxes.")
     return 0
 
 
 def main() -> int:
-    pdf = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PDF
+    args = [a for a in sys.argv[1:]]
+    only_page = None
+    if "--page" in args:
+        i = args.index("--page")
+        only_page = int(args[i + 1]) - 1  # 1-based on the CLI
+        del args[i:i + 2]
+    pdf = Path(args[0]) if args else DEFAULT_PDF
+
     err = _preflight(pdf)
     if err:
         print("spike not run — " + err)
-        return 0  # not a failure; the spike is just waiting on setup
-    try:
-        return run(pdf)
-    except Exception as e:  # noqa: BLE001 — a spike: surface the error verbatim for diagnosis
-        print(f"\nnv-ingest run FAILED: {type(e).__name__}: {e}")
-        print("If this is about run_mode or a missing service, try NVI_RUN_MODE=batch or =service,")
-        print("or paste this error back and we'll adjust the harness.")
-        return 1
+        return 0
+    return run(pdf, only_page)
 
 
 if __name__ == "__main__":

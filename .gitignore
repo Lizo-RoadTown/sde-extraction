@@ -63,3 +63,6 @@ dashboard-reskinned.jpeg
 .idea/
 *.swp
 Thumbs.db
+
+# nv-ingest spike annotated images (dev-tooling output)
+scripts/out/

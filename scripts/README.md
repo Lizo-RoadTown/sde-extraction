@@ -4,32 +4,37 @@ One-off probes and evaluation harnesses. **Not runtime.** Nothing here is import
 worker (`services/extraction/`) or the dashboard (`apps/`); these scripts have their own,
 separate dependencies.
 
-## `spike_nvingest.py` — is nv-ingest a better figure detector?
+## `spike_nvingest.py` — is NVIDIA's page-elements detector better at finding panels?
 
-An evaluation probe. Runs NVIDIA NeMo Retriever (nv-ingest) in **detection-only** mode against
-one PDF and prints the element inventory it finds (text / table / chart / image / infographic,
-per page). The question: **does it cleanly separate a multi-panel figure into its panels?** —
-the thing our caption-regex detector ([apps/dashboard/src/figures.ts](../apps/dashboard/src/figures.ts))
-does weakly (the "captured 3 of 5 panels" problem).
+An evaluation probe. **Rasterizes** each PDF page to an image (PyMuPDF) and POSTs it directly
+to NVIDIA's hosted **page-elements NIM**, which returns layout regions with bounding boxes
+(title / paragraph / table / chart / header_footer). The question: **does it return each figure
+panel as its own `chart` box, or lump a multi-panel figure into one?** — the thing our
+caption-regex detector ([apps/dashboard/src/figures.ts](../apps/dashboard/src/figures.ts)) does
+weakly (the "captured 3 of 5 panels" problem).
+
+**Why direct REST, not the package:** the full `nemo-retriever`/nv-ingest package needs Python
+3.12 and `ray` (no Windows wheel) — it won't install here. We only want the *detector*, which is
+a hosted REST endpoint, so we call it directly. Light deps: PyMuPDF + Pillow + requests.
 
 **What it does and does not touch:**
-- Uses nv-ingest **only as a detector**. No embedding, no vector DB, no LLM.
+- Detector **only**. No embedding, no vector DB, no LLM.
 - **OpenAI + Pydantic stays the extraction brain** ([processor.py](../services/extraction/processor.py)).
-  If nv-ingest wins on detection, it would feed the figure-panel checklist (`FigureRead.panels`,
-  seam S6) — not replace the OpenAI read.
-- `nemo-retriever` is a **separate install** ([requirements-spike.txt](requirements-spike.txt)) —
-  it never enters the worker image.
+  If this wins, it feeds the figure-panel checklist (`FigureRead.panels`, seam S6), and its
+  bounding boxes could also strengthen the locator — it does not replace the OpenAI read.
+- `nemo-retriever` is **never installed**; nothing here enters the worker image.
 
 **Run it:**
 ```bash
 pip install -r scripts/requirements-spike.txt
-export NVIDIA_API_KEY=nvapi-...        # PowerShell: $env:NVIDIA_API_KEY = "nvapi-..."
-python scripts/spike_nvingest.py [path/to.pdf]
+# key: NVIDIA_KEY=nvapi-... in repo-root .env (auto-read), or $env:NVIDIA_API_KEY = "nvapi-..."
+python scripts/spike_nvingest.py [path/to.pdf] [--page N]
 ```
 Defaults to the one real ground-truth PDF we have (the Dengue Ornstein–Uhlenbeck paper in the
-read-only `AT3_review/` reference; only read, never modified). Safe to run before you have the
-key — it explains what's missing and exits cleanly.
+read-only `AT3_review/` reference; only read, never modified). Safe to run before the key exists
+— it explains what's missing and exits cleanly.
 
-**Reading the result:** look at whether each figure panel is its own `chart`/`image` row or
-lumped into one. Compare against the figure's known ground-truth panels. Tunables via env:
-`NVI_RUN_MODE` (`inprocess` default, or `batch` / `service`), and the `NVI_*_URL` endpoints.
+**Reading the result:** the console prints per-page counts (`chart:N, table:M, ...`); **open the
+annotated `scripts/out/*.jpg`** to see the boxes drawn on the page and judge whether each panel
+was found separately. Tunables via env: `NVI_PAGE_CAP`, `NVI_MAX_IMAGE_BYTES`,
+`NVI_PAGE_ELEMENTS_URL`.
