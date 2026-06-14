@@ -80,15 +80,22 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
     job_id = str(job["id"])
     figure_label = job.get("figure_label") or ""
     target = job.get("target") or {"mode": "auto"}
+    # The intake path — stamped on every seam hook so observability decomposes by WHERE the
+    # data came in (lane) and HOW it was targeted (mode) and its origin (source: upload today,
+    # 'doi' once DOI fetch lands). target.source defaults to 'upload', the only live intake.
+    intake = {"lane": target.get("lane"), "mode": target.get("mode"),
+              "source": target.get("source") or "upload"}
     print(f"job {job_id}: extracting (figure={figure_label!r}, mode={target.get('mode')})")
     try:
         paper = db.get_paper(conn, str(job["paper_id"])) or {}
         db.update_job(conn, job_id, stage="extract", progress=0.4)
         pdf_url = _signed_pdf_url(paper, dry_run)
 
+        _t0 = time.monotonic()
         result = processor.run(
             pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
         )
+        extract_ms = int((time.monotonic() - _t0) * 1000)  # the speed dimension for S3
 
         db.update_job(conn, job_id, stage="machine_verify", progress=0.8)
         model = {**result["model"], "_checksums": result["checksums"]}
@@ -96,16 +103,17 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
         # Hooks (best-effort telemetry → validation_events): the extract + locate stages.
         locs = result.get("locations") or {}
         hooks.emit(conn, point="extract", subject_kind="agent", outcome="pass",
-                   job_id=job_id, paper_id=pid, thread_id=job_id,
+                   job_id=job_id, paper_id=pid, thread_id=job_id, latency_ms=extract_ms,
                    subject_id=f"extractor:{processor.MODEL}",
-                   tags={"vars": len(model.get("variables") or []),
+                   tags={**intake,
+                         "vars": len(model.get("variables") or []),
                          "params": len(model.get("parameters") or []),
                          "drift": len(model.get("drift_terms") or []),
                          "diffusion": len(model.get("diffusion_terms") or [])})
         hooks.emit(conn, point="locate", subject_kind="script",
                    outcome="pass" if locs.get("located") else "flag",
                    job_id=job_id, paper_id=pid, thread_id=job_id,
-                   subject_id="locator:pdfplumber", tags=locs)
+                   subject_id="locator:pdfplumber", tags={**intake, **locs})
         # The figure is the anchor — record WHICH figure was extracted. 'auto' means the engine
         # chose; store its choice (the model's own figure_label), not the '(auto)' placeholder.
         figure = (model.get("figure_label") or "").strip() or figure_label or "(figure)"
@@ -123,7 +131,7 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
         db.update_job(conn, job_id, stage="stored", progress=1.0)
         hooks.emit(conn, point="store", subject_kind="script", outcome="pass",
                    job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="storage",
-                   lineage_ref=ext_id, tags={"status": "needs_human", "lane": target.get("lane")})
+                   lineage_ref=ext_id, tags={**intake, "status": "needs_human"})
         print(f"job {job_id}: stored extraction {ext_id} (needs_human)")
     except Exception as e:  # noqa: BLE001 — one bad job shouldn't stop the worker
         print(f"job {job_id}: FAILED — {e}")

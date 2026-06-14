@@ -75,6 +75,8 @@ export function SeamMap() {
         const t = s.lastTags as Record<string, number>;
         lines.push(`located ${t.located ?? 0} · missing ${t.missing ?? 0}`);
       }
+      const lanes = Object.entries(s.byLane);
+      if (lanes.length) lines.push(lanes.map(([k, n]) => `${k} ${n}`).join(" · "));
       return { lines, live: true };
     }
     if (seam.id === "S8") return { lines: [`${vh.extracted} stored`], live: vh.extracted > 0 };
@@ -86,6 +88,11 @@ export function SeamMap() {
 
   const animate = !reduced();
 
+  // Real intake counts: every job crosses the `extract` seam, so its bySource is the origin tally.
+  const bySource = stats["extract"]?.bySource ?? {};
+  const uploadN = bySource["upload"] ?? 0;
+  const doiN = bySource["doi"] ?? 0;
+
   return (
     <Card className="flex flex-col gap-1">
       <div className="mb-1 flex items-center justify-between">
@@ -93,11 +100,13 @@ export function SeamMap() {
         <span className="text-[11px] text-ink-faint">drawers (systems) · seams (transfers) — watch at the seams</span>
       </div>
 
-      {/* converging intake header */}
+      {/* converging intake header — real per-origin counts where the extract seam has emitted */}
       <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md bg-inset px-3 py-2 text-[11px]">
         <span className="text-ink-faint uppercase tracking-wide">intake →</span>
-        <Badge tone="green">PDF upload</Badge>
-        <span className="rounded-full bg-surface-raised px-1.5 py-0.5 text-[10px] text-ink-faint">DOI fetch · planned</span>
+        <Badge tone="green">PDF upload{uploadN ? ` · ${uploadN}` : ""}</Badge>
+        <span className="rounded-full bg-surface-raised px-1.5 py-0.5 text-[10px] text-ink-faint">
+          DOI fetch · {doiN ? doiN : "planned"}
+        </span>
         <span className="text-ink-faint">→ converge at the job queue → the pipeline below</span>
       </div>
 

@@ -371,6 +371,8 @@ export interface SeamStat {
   fail: number;
   avgLatencyMs: number | null;
   lastTags: Record<string, unknown> | null;
+  byLane: Record<string, number>;    // intake decomposition — how many crossed per lane
+  bySource: Record<string, number>;  // …and per origin (upload / doi / …)
 }
 
 export async function loadSeamTelemetry(): Promise<Record<string, SeamStat>> {
@@ -384,18 +386,21 @@ export async function loadSeamTelemetry(): Promise<Record<string, SeamStat>> {
   const acc: Record<string, SeamStat & { _lat: number[] }> = {};
   for (const r of (data ?? []) as Record<string, unknown>[]) {
     const p = String(r.point);
-    const s = (acc[p] ??= { point: p, count: 0, pass: 0, flag: 0, fail: 0, avgLatencyMs: null, lastTags: null, _lat: [] });
+    const s = (acc[p] ??= { point: p, count: 0, pass: 0, flag: 0, fail: 0, avgLatencyMs: null, lastTags: null, byLane: {}, bySource: {}, _lat: [] });
     s.count++;
     const o = String(r.outcome);
     if (o === "pass") s.pass++; else if (o === "flag") s.flag++; else if (o === "fail") s.fail++;
     if (typeof r.latency_ms === "number") s._lat.push(r.latency_ms);
     if (s.lastTags === null && r.tags) s.lastTags = r.tags as Record<string, unknown>; // newest first → first seen is latest
+    const tg = (r.tags ?? {}) as Record<string, unknown>;
+    if (typeof tg.lane === "string") s.byLane[tg.lane] = (s.byLane[tg.lane] ?? 0) + 1;
+    if (typeof tg.source === "string") s.bySource[tg.source] = (s.bySource[tg.source] ?? 0) + 1;
   }
   const out: Record<string, SeamStat> = {};
   for (const [p, s] of Object.entries(acc)) {
     out[p] = { point: s.point, count: s.count, pass: s.pass, flag: s.flag, fail: s.fail,
       avgLatencyMs: s._lat.length ? Math.round(s._lat.reduce((a, b) => a + b, 0) / s._lat.length) : null,
-      lastTags: s.lastTags };
+      lastTags: s.lastTags, byLane: s.byLane, bySource: s.bySource };
   }
   return out;
 }
