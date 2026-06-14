@@ -1,6 +1,10 @@
-import { Card, SectionTitle, Badge, StatCard } from "../ui";
+import { lazy, Suspense, useState } from "react";
+import { Card, SectionTitle, Badge, StatCard, cx } from "../ui";
 import { ValidationChain } from "./ValidationChain";
 import { SeamMap } from "./SeamMap";
+
+// 3D view is lazy-loaded so three.js (~150KB gz) only enters the bundle when the user opens it.
+const SeamMap3D = lazy(() => import("./SeamMap3D").then((m) => ({ default: m.SeamMap3D })));
 
 // Extraction Health — "how well is the engine doing, and is it improving?"
 // Two real concerns in one home: CONFIDENCE (earned per extractor x dimension-value)
@@ -58,16 +62,39 @@ function ConfidenceRow({ tag, score, n }: { tag: string; score: number; n: numbe
 }
 
 export function ExtractionHealth() {
+  const [view, setView] = useState<"2d" | "3d">("2d");
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <SectionTitle hint="Observability as a map: where the data rests (drawers) and every place it transfers (seams). We watch at the seams — telemetry richness follows coupling. Governance rules attach where the data moves.">
         Extraction Health
       </SectionTitle>
 
-      {/* the seam map — the centerpiece. Drawers as zones, seams as living connectors, in order,
-          with real validation_events telemetry where the worker has emitted it (S3/S4/S8) and
-          honest "no telemetry yet" elsewhere. Per the nearly-decomposable observability doc. */}
-      <SeamMap />
+      {/* the seam map — the centerpiece. 2D is the precise view (exact counts/latency); 3D is the
+          gestalt of data flowing through the system (depth), both from the same validation_events. */}
+      <div>
+        <div className="mb-2 flex items-center justify-end">
+          <div className="flex rounded-md border border-edge p-0.5 text-[11px]">
+            {(["2d", "3d"] as const).map((v) => (
+              <button key={v} type="button" onClick={() => setView(v)}
+                className={cx("rounded px-2 py-0.5 uppercase tracking-wide transition-colors",
+                  view === v ? "bg-surface-raised text-ink" : "text-ink-faint hover:text-ink-dim")}>
+                {v === "2d" ? "2D · precise" : "3D · flow"}
+              </button>
+            ))}
+          </div>
+        </div>
+        {view === "2d" ? (
+          <SeamMap />
+        ) : (
+          <Suspense fallback={
+            <div className="flex h-[420px] items-center justify-center rounded-md border border-edge bg-inset text-sm text-ink-faint">
+              loading 3D view…
+            </div>
+          }>
+            <SeamMap3D />
+          </Suspense>
+        )}
+      </div>
 
       {/* the validation chain — the V1–V8 governance gates that attach to those seams */}
       <ValidationChain />
