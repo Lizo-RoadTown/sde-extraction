@@ -360,6 +360,46 @@ export interface AgentHealth {
   verified: number;   // its output that passed V8 (downstream outcome — once verdicts are wired)
 }
 
+// Per-SEAM telemetry — the observability spine made real. Aggregates validation_events by
+// `point` (the seam) so Extraction Health can render each data-transfer point with its live
+// counts/outcome/latency. Empty until the worker has emitted events; the UI shows that honestly.
+export interface SeamStat {
+  point: string;
+  count: number;
+  pass: number;
+  flag: number;
+  fail: number;
+  avgLatencyMs: number | null;
+  lastTags: Record<string, unknown> | null;
+}
+
+export async function loadSeamTelemetry(): Promise<Record<string, SeamStat>> {
+  if (!supabase) return {};
+  const { data, error } = await supabase
+    .from("validation_events")
+    .select("point, outcome, latency_ms, tags, created_at")
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (error) { console.error("loadSeamTelemetry:", error.message); return {}; }
+  const acc: Record<string, SeamStat & { _lat: number[] }> = {};
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const p = String(r.point);
+    const s = (acc[p] ??= { point: p, count: 0, pass: 0, flag: 0, fail: 0, avgLatencyMs: null, lastTags: null, _lat: [] });
+    s.count++;
+    const o = String(r.outcome);
+    if (o === "pass") s.pass++; else if (o === "flag") s.flag++; else if (o === "fail") s.fail++;
+    if (typeof r.latency_ms === "number") s._lat.push(r.latency_ms);
+    if (s.lastTags === null && r.tags) s.lastTags = r.tags as Record<string, unknown>; // newest first → first seen is latest
+  }
+  const out: Record<string, SeamStat> = {};
+  for (const [p, s] of Object.entries(acc)) {
+    out[p] = { point: s.point, count: s.count, pass: s.pass, flag: s.flag, fail: s.fail,
+      avgLatencyMs: s._lat.length ? Math.round(s._lat.reduce((a, b) => a + b, 0) / s._lat.length) : null,
+      lastTags: s.lastTags };
+  }
+  return out;
+}
+
 export async function loadAgentHealth(): Promise<AgentHealth> {
   const zero: AgentHealth = { processed: 0, succeeded: 0, failed: 0, inFlight: 0, needsHuman: 0, verified: 0 };
   if (!supabase) return zero;

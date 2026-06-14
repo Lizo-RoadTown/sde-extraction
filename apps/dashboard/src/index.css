@@ -99,6 +99,13 @@ body {
 }
 .fill-pop { animation: fill-pop 200ms ease-out both; }
 
+/* Seam map (Extraction Health): a flowing dash on a live seam connector — the
+   "data is moving through this transfer point" signal. Telemetry-as-shape. */
+@keyframes sde-flow {
+  from { background-position: 0 0; }
+  to   { background-position: 0 8px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fill-pop { animation: none; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

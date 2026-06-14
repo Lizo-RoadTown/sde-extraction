@@ -1,5 +1,6 @@
 import { Card, SectionTitle, Badge, StatCard } from "../ui";
 import { ValidationChain } from "./ValidationChain";
+import { SeamMap } from "./SeamMap";
 
 // Extraction Health — "how well is the engine doing, and is it improving?"
 // Two real concerns in one home: CONFIDENCE (earned per extractor x dimension-value)
@@ -59,11 +60,16 @@ function ConfidenceRow({ tag, score, n }: { tag: string; score: number; n: numbe
 export function ExtractionHealth() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <SectionTitle hint="Every boundary the data crosses is a validation gate, and the health of each. Confidence is earned from your verifications; it is never assigned.">
+      <SectionTitle hint="Observability as a map: where the data rests (drawers) and every place it transfers (seams). We watch at the seams — telemetry richness follows coupling. Governance rules attach where the data moves.">
         Extraction Health
       </SectionTitle>
 
-      {/* the validation chain — the telemetry spine as a diagram, with real counts where they exist */}
+      {/* the seam map — the centerpiece. Drawers as zones, seams as living connectors, in order,
+          with real validation_events telemetry where the worker has emitted it (S3/S4/S8) and
+          honest "no telemetry yet" elsewhere. Per the nearly-decomposable observability doc. */}
+      <SeamMap />
+
+      {/* the validation chain — the V1–V8 governance gates that attach to those seams */}
       <ValidationChain />
 
       {/* headline gauges (sample until the per-gate telemetry events are emitted) */}
