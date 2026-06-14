@@ -82,6 +82,11 @@ and `tags` (the type/count/tier detail). This is Simon's "interact only through 
 variables," recorded. The worker emits these today at **S3 (`extract`)**, **S4 (`locate`)**, and
 **S8 (`store`)**; the dashboard aggregates them with `loadSeamTelemetry()`.
 
+Each hook also stamps the **intake path** — `lane`, `mode`, and `source` (`upload` today, `doi`
+once DOI fetch lands) — so a seam's telemetry **decomposes by where the data came in**. The
+converging-intake header reads real per-origin counts from this, and `extract` records its
+**latency** — the speed dimension that gives the fan-out its flow.
+
 Seams that don't emit yet show **"no telemetry yet"** — honest, not hidden. As each pipeline
 stage lands its hook, its seam goes live; the map never pretends to data it doesn't have.
 
