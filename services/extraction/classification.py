@@ -195,3 +195,86 @@ def registry_reference() -> str:
     lines.append("Calculus convention: one of ito | stratonovich | unspecified.")
     lines.append("If the family cannot be determined from the document, use 'unclassified' — never guess.")
     return "\n".join(lines)
+
+
+# ============================================================
+# THE CLASSIFICATION-CANDIDATE HITL TRACK  (the governed "add" half of match-or-add)
+#
+# A SECOND, STARRED pathway, distinct from extraction pass/fail. When the model-match proposes a
+# NEW family/transformation (ModelClassification.family_is_new) or cannot classify
+# (family_name == "unclassified"), the paper does NOT go straight to pass/fail. It:
+#   1. raises a ClassificationCandidate (added to the candidates list),
+#   2. PARKS the extraction at the `needs_classification` gate (Track B blocks Track A),
+#   3. a human is led through the paper again to verify the new classification,
+#   4. on approval the registry GROWS (candidate_to_entry) and any new rules are applied,
+#      unblocking the gate,
+#   5. the paper re-enters the NORMAL pathway (re-extract with the now-known class) -> pass/fail.
+# Design: docs/proposals/2026-06-13-classification-taxonomy-foundation.md
+# ============================================================
+
+# Status an extraction parks in while its candidate is reviewed. Sits BEFORE 'needs_human'
+# (Track A): Track B must resolve first. (Persisted as extractions.status in a later migration.)
+NEEDS_CLASSIFICATION = "needs_classification"
+
+CandidateKind = Literal["formulation_family", "transformation"]
+CandidateStatus = Literal["pending", "approved", "rejected", "merged"]
+
+
+class ClassificationCandidate(BaseModel):
+    """A proposed NEW classification raised by the model-match, awaiting human verification.
+
+    Evidence-anchored (quote + page) so the reviewer — and a script — can check it against the
+    paper (the determinism web). Approving converts it to a registry entry (candidate_to_entry)
+    and unblocks the paper; 'merged' means the reviewer mapped it onto an existing family instead.
+    """
+
+    kind: CandidateKind = "formulation_family"
+    proposed_name: str = ""           # the agent's proposed slug (blank if it just said 'unclassified')
+    proposed_label: str = ""
+    how_noise_enters: str = ""        # families only
+    recognized_by: str = ""
+    evidence_quote: str = ""
+    evidence_page: Optional[int] = None
+    source_paper_id: str = ""
+    source_job_id: Optional[str] = None
+    rationale: str = ""
+    status: CandidateStatus = "pending"
+    merged_into: Optional[str] = None  # set when status == 'merged' (an existing family name)
+
+
+def trigger_candidate(
+    mc: "ModelClassification", *, paper_id: str, job_id: Optional[str] = None,
+) -> Optional[ClassificationCandidate]:
+    """Deterministic trigger for the starred track: raise a candidate IFF the model-match proposed
+    a new family or could not classify. Returns None when a known family matched (the paper goes
+    straight down the normal pathway). This is the gate's on/off switch — falsifiable, not a guess."""
+    if mc.family_is_new or mc.family_name == "unclassified":
+        proposed = mc.family_name if mc.family_is_new else ""
+        return ClassificationCandidate(
+            kind="formulation_family",
+            proposed_name=proposed,
+            proposed_label=proposed,
+            evidence_quote=mc.evidence_quote,
+            evidence_page=mc.evidence_page,
+            source_paper_id=paper_id,
+            source_job_id=job_id,
+            rationale=mc.rationale,
+        )
+    return None
+
+
+def candidate_to_entry(c: ClassificationCandidate) -> "FormulationFamily | Transformation":
+    """The 'unblock -> grow' operation: a human-APPROVED candidate becomes a registry entry the
+    caller appends to FORMULATION_FAMILIES / TRANSFORMATIONS (and persists). It's corpus-confirmed
+    by definition — it came from a real paper a human verified."""
+    seen = [c.source_paper_id] if c.source_paper_id else []
+    if c.kind == "transformation":
+        return Transformation(
+            name=_norm(c.proposed_name), label=c.proposed_label or c.proposed_name,
+            recognized_by=c.recognized_by, provenance="corpus-confirmed", seen_in=seen,
+        )
+    return FormulationFamily(
+        name=_norm(c.proposed_name), label=c.proposed_label or c.proposed_name,
+        how_noise_enters=c.how_noise_enters, recognized_by=c.recognized_by,
+        provenance="corpus-confirmed", seen_in=seen,
+    )

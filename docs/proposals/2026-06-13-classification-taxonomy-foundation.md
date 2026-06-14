@@ -121,6 +121,42 @@ when to mark **absent**, or how to **constrain** the search.
 …) from ground truth into the reference glossary, plus explicit **rules** for the three sub-agent
 decisions (skip a non-parameter symbol / mark absent / how tightly to constrain the value search).
 
+## The classification-candidate HITL track (the governed "add")
+
+The registry grows only through a human gate — a **second, starred pathway** distinct from the
+normal "does this extraction pass?" review:
+
+- **Trigger (deterministic):** the model-match returns `family_is_new=True` (proposed a family not
+  in the registry) or `family_name="unclassified"` (couldn't classify). `trigger_candidate()` in
+  [classification.py](../../services/extraction/classification.py) is the gate's on/off switch —
+  falsifiable, not a guess.
+- **Raise + park:** a `ClassificationCandidate` (evidence-anchored: quote + page) is added to the
+  candidates list, and the extraction parks at the `needs_classification` gate. **Track B blocks
+  Track A** — the paper cannot go to pass/fail until the classification is resolved.
+- **Human verifies the classification:** led through the paper *again*, the reviewer confirms it's
+  genuinely new (name it, describe `how_noise_enters` + `recognized_by`), **rejects** it, or
+  **merges** it onto an existing family.
+- **Unblock → grow → reapply rules:** on approval, `candidate_to_entry()` turns it into a
+  registry entry (corpus-confirmed) appended to the registry and persisted; any new rules tied to
+  that family (recognized-by cues, validators) are applied.
+- **Re-enter the normal pathway:** the paper then runs the *same* extraction pathway with the
+  now-known classification → Track A pass/fail.
+
+Two tracks, one of which gates the other:
+
+```
+model-match → ModelClassification
+   ├─ known family ───────────────────────────────────► normal pathway → pass/fail   (Track A)
+   └─ new / unclassified → candidate → needs_classification gate                       (Track B)
+                                   → human verifies → grow registry (+rules)
+                                   → re-enter normal pathway → pass/fail
+```
+
+This is the governed "add" half of the self-growing registry: it never auto-expands, and every
+new category is human-verified against a real paper. (Persistence — a `classification_candidates`
+table + the `needs_classification` status + the review UI — is the next build once the shape is
+validated.)
+
 ## How it plugs into the pipeline (the seams)
 
 - Steps 2–3's rasterize+label front-end → the figure-enumeration pass (OpenAI vision).
