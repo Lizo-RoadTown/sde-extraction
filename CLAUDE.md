@@ -24,7 +24,7 @@ When the website/UI surface materializes later, expect a second instance (`sde-e
 | File | Purpose |
 |---|---|
 | `README.md` | Repo overview + layout |
-| `skills/` and `skills_private/` | 16 methodology skill files bundled locally |
+| Canonical patterns | See section below — they live in the `liz-patterns` plugin now, NOT in this repo |
 | `.project-intelligence/instances.json` | Canonical manifest |
 | `.project-intelligence/sde-extraction-dev/agent-profile.json` | YOUR profile + memory discipline |
 | `.project-intelligence/sde-extraction-dev/project-context.json` | What this project is about (will evolve as research clarifies) |
@@ -132,6 +132,22 @@ Bundled locally — don't fetch from remote. Read the relevant SKILL.md before w
 
 Plain, direct, descriptive. No marketing voice. Same rule as all of Liz's repos.
 
+## Canonical patterns (operator's patterns library)
+
+The canonical home for reusable agents + skills + tools is the `liz-patterns` plugin:
+
+```text
+/plugin marketplace add Lizo-RoadTown/claude-skills-marketplace
+/plugin install liz-patterns@lizo-skills
+```
+
+This makes the following available **by name**:
+
+- **Agents**: `liz-patterns:infrastructure-mapping`, `next-actions-planning`, `lessons-learned`, `orchestration-cataloging`, `eval-deep-research`, `web-app-scaffold`, `agentic-upskilling`
+- **Skills**: `liz-patterns:agentic-skill-design`, `deep-research-pattern`, `design-evaluation`, `documentation`, `document-parsing`, `layered-explanation`, `open-source-documentation`, `proposal-authoring`
+
+**Do not look for these in this repo's local `skills/` directory** — the 16 patterns previously there were deleted in commit `fbbe09c` 2026-06-14. They live in the plugin. Per [tapestry/MANIFESTO.md Pillar 1](https://github.com/Lizo-RoadTown/tapestry/blob/main/MANIFESTO.md): ONE pattern, ONE name, ONE canonical home.
+
 ## Commit + PR discipline
 
 - Small PRs, one concern per branch
@@ -142,7 +158,7 @@ Plain, direct, descriptive. No marketing voice. Same rule as all of Liz's repos.
 ## What to do when in doubt
 
 1. `memory_recall(context="<your current task>", project_tags=["sde-extraction-dev"])` — see if past sessions covered this
-2. Read the relevant `SKILL.md` from `skills/<name>/` or `skills_private/<name>/`
+2. Invoke the relevant pattern by name from the `liz-patterns` plugin (see Canonical patterns section above)
 3. Read `docs/architecture/loom-wiring.md` for integration
 4. Check `.project-intelligence/sde-extraction-dev/` configs
 5. If about to make a destructive change, ask Liz first
