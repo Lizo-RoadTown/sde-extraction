@@ -137,6 +137,35 @@ class TimeSpan(BaseModel):
     final_time: Slot
 
 
+class FigureRead(BaseModel):
+    """The figure as the ANCHOR, read FIRST (its own sub-agent). Identity + the CHECKLIST of
+    panels (each subplot's plotted variable). The checklist drives one extractor per variable
+    and the completeness cross-check, so a 5-panel figure with only 3 captured vars is FLAGGED.
+    [stage: figure reader]
+    """
+
+    figure_label: str
+    figure_type: str
+    outcome: str
+    pathogen: str
+    panels: list[str]   # the variable plotted in each panel, in order: ["x(t)","I(t)","y(t)","v(t)","w(t)"]
+    time_span: "TimeSpan"
+
+
+class VariableExtraction(BaseModel):
+    """ONE state variable's SDE machinery, extracted by its own focused sub-agent (focused =
+    complete). The parameters are those appearing in THIS variable's equation; a script
+    reconciles them across variables into the system's parameter set. [stage: variable extractor]
+    """
+
+    symbol: str          # the variable this is for (from the checklist), e.g. "x"
+    meaning: Slot
+    initial_value: Slot
+    drift: Slot          # the deterministic RHS for d{symbol} = ( … ) dt
+    diffusion: Slot      # the noise RHS: … dW
+    parameters: list[Parameter]  # constants appearing in this variable's equation
+
+
 class FigureExtraction(BaseModel):
     """One (paper, figure) extraction — the unit of work and the OpenAI response_format.
 
