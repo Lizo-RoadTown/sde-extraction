@@ -3,7 +3,6 @@ import { Queue } from "./surfaces/Queue";
 import { Library } from "./surfaces/Library";
 import { ExtractionHealth } from "./surfaces/ExtractionHealth";
 import { AgentHealth } from "./surfaces/AgentHealth";
-import { Docs } from "./surfaces/Docs";
 import { VerifyPage } from "./surfaces/VerifyPage";
 import { FingerprintJourney } from "./surfaces/FingerprintJourney";
 import { SAMPLE_EXTRACTION } from "./preview";
@@ -23,8 +22,14 @@ const NAV: { to: string; label: string; blurb: string }[] = [
   { to: "/library", label: "Library", blurb: "verified models" },
   { to: "/health", label: "Extraction Health", blurb: "gates · point health" },
   { to: "/agents", label: "Agent Health", blurb: "the agents at each gate" },
-  { to: "/docs", label: "Docs", blurb: "canon · schema · decisions" },
 ];
+
+// External destinations (link OUT from the header — NOT app surfaces). Documentation is its own
+// site (apps/docs, deployed separately); set VITE_DOCS_URL to its URL. Until it's deployed, this
+// falls back to the docs source on GitHub.
+const GITHUB_URL = "https://github.com/Lizo-RoadTown/sde-extraction";
+const DOCS_URL = (import.meta.env.VITE_DOCS_URL as string | undefined)
+  || "https://github.com/Lizo-RoadTown/sde-extraction/tree/main/apps/docs";
 
 function isActive(route: string, to: string): boolean {
   return to === "/" ? route === "/" : route === to || route.startsWith(to + "/");
@@ -37,7 +42,6 @@ function CurrentView({ route }: { route: string }) {
   if (route === "/library") return <Library />;
   if (route === "/health") return <ExtractionHealth />;
   if (route === "/agents") return <AgentHealth />;
-  if (route === "/docs") return <Docs />;
   if (route === "/fingerprint") return <FingerprintJourney ext={SAMPLE_EXTRACTION} />; // aesthetic sandbox
   return <SingleRun />; // "/" and any unknown route
 }
@@ -91,6 +95,14 @@ export default function App() {
         <header className="flex h-13 items-center justify-between border-b border-edge px-6 py-3">
           <div className="text-sm text-ink-dim">{currentLabel(route)}</div>
           <div className="flex items-center gap-3 text-xs text-ink-dim">
+            <a href={DOCS_URL} target="_blank" rel="noreferrer"
+              className="rounded-full px-2 py-1 text-ink-faint transition hover:bg-surface-raised hover:text-ink">
+              Documentation ↗
+            </a>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer"
+              className="rounded-full px-2 py-1 text-ink-faint transition hover:bg-surface-raised hover:text-ink">
+              GitHub ↗
+            </a>
             <PreviewToggle />
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 animate-pulse rounded-full bg-present" />
