@@ -240,7 +240,7 @@ def registry_reference() -> str:
 # (Track A): Track B must resolve first. (Persisted as extractions.status in a later migration.)
 NEEDS_CLASSIFICATION = "needs_classification"
 
-CandidateKind = Literal["formulation_family", "transformation"]
+CandidateKind = Literal["formulation_family", "transformation", "variable_role"]
 CandidateStatus = Literal["pending", "approved", "rejected", "merged"]
 
 
@@ -287,13 +287,18 @@ def trigger_candidate(
     return None
 
 
-def candidate_to_entry(c: ClassificationCandidate) -> "FormulationFamily | Transformation":
+def candidate_to_entry(c: ClassificationCandidate) -> "FormulationFamily | Transformation | VariableRole":
     """The 'unblock -> grow' operation: a human-APPROVED candidate becomes a registry entry the
-    caller appends to FORMULATION_FAMILIES / TRANSFORMATIONS (and persists). It's corpus-confirmed
-    by definition — it came from a real paper a human verified."""
+    caller appends to FORMULATION_FAMILIES / TRANSFORMATIONS / VARIABLE_ROLES (and persists). It's
+    corpus-confirmed by definition — it came from a real paper a human verified."""
     seen = [c.source_paper_id] if c.source_paper_id else []
     if c.kind == "transformation":
         return Transformation(
+            name=_norm(c.proposed_name), label=c.proposed_label or c.proposed_name,
+            recognized_by=c.recognized_by, provenance="corpus-confirmed", seen_in=seen,
+        )
+    if c.kind == "variable_role":
+        return VariableRole(
             name=_norm(c.proposed_name), label=c.proposed_label or c.proposed_name,
             recognized_by=c.recognized_by, provenance="corpus-confirmed", seen_in=seen,
         )
@@ -302,3 +307,117 @@ def candidate_to_entry(c: ClassificationCandidate) -> "FormulationFamily | Trans
         how_noise_enters=c.how_noise_enters, recognized_by=c.recognized_by,
         provenance="corpus-confirmed", seen_in=seen,
     )
+
+
+# ============================================================
+# STEP 2 — VARIABLE / INITIAL-CONDITION CLASSIFICATION
+#
+# So the variable sub-agents know what each state variable IS — its ROLE — and can match the
+# model's variables to the figure's panels. Seeded from the 12 completed AT3 reviews (every role
+# below is corpus-confirmed). Same canon as Step 1: classify the ROLE (identification), never the
+# value; self-growing match-or-add registry; the present/absent VALUE (meaning, initial_value)
+# stays in schema.py's Slots.
+#
+# THE CENTRAL HAZARD (why this exists): the SAME SYMBOL means DIFFERENT roles across papers —
+#   V = vaccinated (Witbooi) AND viral load (HBV, within-host);  x = an OU log-process noise
+#   driver (Dengue) AND target cells (Viral Infection);  Z/w = immune response.
+# So the role MUST be read from the paper's stated meaning, NEVER inferred from the letter.
+# `typical_symbols` are conventions to recognize by, NOT constraints.
+# ============================================================
+
+
+class VariableRole(BaseModel):
+    name: str                       # match key, e.g. "auxiliary-process"
+    label: str
+    recognized_by: str              # cues in the stated meaning the classifier keys on
+    typical_symbols: list[str] = []  # common letters — CONVENTION, not a rule (symbols are ambiguous)
+    provenance: Provenance = "corpus-confirmed"
+    seen_in: list[str] = []
+
+
+VARIABLE_ROLES: list[VariableRole] = [
+    VariableRole(name="susceptible", label="Susceptible",
+                 recognized_by="susceptible / uninfected / at-risk; target cells available to infect",
+                 typical_symbols=["S", "SH", "x"], seen_in=["Cholera", "Koufi", "Witbooi_Malaria"]),
+    VariableRole(name="exposed-latent", label="Exposed / latent",
+                 recognized_by="exposed / latent / incubating — infected but not yet infectious",
+                 typical_symbols=["E", "L", "l"], seen_in=["Chikungunya Virus", "Koufi", "Viral Infection"]),
+    VariableRole(name="infected", label="Infected / infectious",
+                 recognized_by="infected / infectious / productively-infected cells",
+                 typical_symbols=["I", "IH", "IV", "Ip", "Iq", "y", "D"],
+                 seen_in=["Typhoid Fever Pneumonia", "Malaria", "Viral Infection", "HBV"]),
+    VariableRole(name="asymptomatic", label="Asymptomatic carrier",
+                 recognized_by="asymptomatic / mild — transmits without symptoms",
+                 typical_symbols=["A"], seen_in=["DOI_10.1016_Koufi_2022"]),
+    VariableRole(name="recovered", label="Recovered / removed",
+                 recognized_by="recovered / removed / immune after infection",
+                 typical_symbols=["R", "RH", "Rp", "Rq"], seen_in=["Witbooi_Malaria", "Malaria", "Typhoid Fever Pneumonia"]),
+    VariableRole(name="vaccinated", label="Vaccinated / immunized",
+                 recognized_by="vaccinated / immunized by intervention (NOTE: V also denotes viral load — read the meaning)",
+                 typical_symbols=["V", "J"], seen_in=["Witbooi_Malaria"]),
+    VariableRole(name="pathogen-load", label="Pathogen load (virus / bacteria)",
+                 recognized_by="free virus / viral load / bacterial concentration — a pathogen quantity, not a host count",
+                 typical_symbols=["V", "v", "B"], seen_in=["HBV", "Viral Infection", "Typhoid Fever Pneumonia", "Chikungunya Virus"]),
+    VariableRole(name="immune-response", label="Immune response (antibody / effector)",
+                 recognized_by="antibody / immune effector / CTL response level",
+                 typical_symbols=["Z", "w"], seen_in=["Dengue Infection OrnsteinUhlenbeck", "Viral Infection"]),
+    VariableRole(name="vector-state", label="Vector compartment (host-vector model)",
+                 recognized_by="a vector (e.g. mosquito) compartment — paired SV/IV alongside human SH/IH/RH",
+                 typical_symbols=["SV", "IV"], seen_in=["Malaria"]),
+    VariableRole(name="host-cell", label="Host cell population (within-host)",
+                 recognized_by="a host cell population in a within-host model (hepatocytes, target/infected cells)",
+                 typical_symbols=["H", "D", "x"], seen_in=["HBV", "Viral Infection"]),
+    VariableRole(name="auxiliary-process", label="Auxiliary stochastic process (NOT a compartment)",
+                 recognized_by="an auxiliary stochastic driver (e.g. an Ornstein–Uhlenbeck log-process) that FEEDS a rate; not a population",
+                 typical_symbols=["x"], seen_in=["Dengue Infection OrnsteinUhlenbeck", "10_1007s00332.023_copy"]),
+]
+
+
+class VariableClassification(BaseModel):
+    """A variable sub-agent's identification of ONE state variable for the chosen figure.
+
+    Identification only (the role), evidence-anchored. The variable's MEANING and INITIAL_VALUE
+    stay present/absent Slots in schema.py; `initial_condition` here just flags the IC status so the
+    sub-agent knows whether to record it stated, not_stated, or requires_inference (never invent).
+    """
+
+    symbol: str                                # the variable, from the figure-panel checklist
+    role: str                                  # a VARIABLE_ROLES name | "unclassified" | a proposed new name
+    role_is_new: bool = False                  # True => proposed role not in the registry (audit it)
+    initial_condition: Literal["stated", "not_stated", "requires_inference"] = "not_stated"
+    evidence_quote: str = ""                   # verbatim text supporting the role call
+    evidence_page: Optional[int] = None
+    rationale: str = ""
+
+
+def match_role(name: str) -> Optional[VariableRole]:
+    key = _norm(name)
+    for r in VARIABLE_ROLES:
+        if _norm(r.name) == key or _norm(r.label) == key:
+            return r
+    return None
+
+
+def trigger_variable_candidate(
+    vc: VariableClassification, *, paper_id: str, job_id: Optional[str] = None,
+) -> Optional[ClassificationCandidate]:
+    """Starred-track trigger for a NEW variable role (same governed-add as families)."""
+    if vc.role_is_new or vc.role == "unclassified":
+        proposed = vc.role if vc.role_is_new else ""
+        return ClassificationCandidate(
+            kind="variable_role", proposed_name=proposed, proposed_label=proposed,
+            evidence_quote=vc.evidence_quote, evidence_page=vc.evidence_page,
+            source_paper_id=paper_id, source_job_id=job_id, rationale=vc.rationale,
+        )
+    return None
+
+
+def variable_registry_reference() -> str:
+    """Glossary handed to the variable sub-agent prompt — generated from this single source."""
+    lines = ["Known variable roles (classify each variable's ROLE from its STATED MEANING — "
+             "NEVER from its letter; the same symbol means different roles in different papers):"]
+    for r in VARIABLE_ROLES:
+        lines.append(f"- {r.name} — {r.label}. Recognize by: {r.recognized_by}. Common symbols (convention only): {', '.join(r.typical_symbols)}.")
+    lines.append("If the role cannot be determined from the document, use 'unclassified' — never guess.")
+    lines.append("Record the initial condition as stated | not_stated | requires_inference (never invent a value).")
+    return "\n".join(lines)
