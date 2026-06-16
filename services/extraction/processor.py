@@ -17,7 +17,7 @@ import tempfile
 import urllib.request
 from typing import Any, Optional
 
-from schema import FigureExtraction, FigurePanels, checksums_for
+from schema import FigureExtraction, checksums_for
 
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-2024-08-06")
 
