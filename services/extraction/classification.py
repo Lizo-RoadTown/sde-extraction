@@ -240,7 +240,7 @@ def registry_reference() -> str:
 # (Track A): Track B must resolve first. (Persisted as extractions.status in a later migration.)
 NEEDS_CLASSIFICATION = "needs_classification"
 
-CandidateKind = Literal["formulation_family", "transformation", "variable_role"]
+CandidateKind = Literal["formulation_family", "transformation", "variable_role", "parameter_role"]
 CandidateStatus = Literal["pending", "approved", "rejected", "merged"]
 
 
@@ -299,6 +299,11 @@ def candidate_to_entry(c: ClassificationCandidate) -> "FormulationFamily | Trans
         )
     if c.kind == "variable_role":
         return VariableRole(
+            name=_norm(c.proposed_name), label=c.proposed_label or c.proposed_name,
+            recognized_by=c.recognized_by, provenance="corpus-confirmed", seen_in=seen,
+        )
+    if c.kind == "parameter_role":
+        return ParameterRole(
             name=_norm(c.proposed_name), label=c.proposed_label or c.proposed_name,
             recognized_by=c.recognized_by, provenance="corpus-confirmed", seen_in=seen,
         )
@@ -420,4 +425,138 @@ def variable_registry_reference() -> str:
         lines.append(f"- {r.name} — {r.label}. Recognize by: {r.recognized_by}. Common symbols (convention only): {', '.join(r.typical_symbols)}.")
     lines.append("If the role cannot be determined from the document, use 'unclassified' — never guess.")
     lines.append("Record the initial condition as stated | not_stated | requires_inference (never invent a value).")
+    return "\n".join(lines)
+
+
+# ============================================================
+# STEP 3 — PARAMETER CLASSIFICATION
+#
+# So the parameter sub-agents know what each constant IS (its role), and — per Liz — know when to
+# SKIP a symbol (not a model parameter), when to mark it ABSENT (value not stated / requires
+# inference), or how to CONSTRAIN the value search (the role says what KIND of value to expect).
+# Seeded from the 12 completed AT3 reviews. Same canon: classify the role, never invent the value.
+#
+# The SDE-critical roles the harvest surfaced: noise-intensity (sigma/sigma1..n — the diffusion
+# coefficients), mean-reversion-rate (theta), reversion-level (x_bar — the CANONICAL absent:
+# "never stated explicitly" -> requires_inference, per the Dengue OU review).
+# ============================================================
+
+
+class ParameterRole(BaseModel):
+    name: str
+    label: str
+    recognized_by: str
+    typical_symbols: list[str] = []   # CONVENTION only — symbols vary by paper
+    constrains: str = ""              # what KIND of value to expect (guidance, not a hard bound)
+    provenance: Provenance = "corpus-confirmed"
+    seen_in: list[str] = []
+
+
+PARAMETER_ROLES: list[ParameterRole] = [
+    ParameterRole(name="recruitment", label="Recruitment / birth / inflow",
+                  recognized_by="inflow into the population (births, recruitment, immigration)",
+                  typical_symbols=["Lambda", "lam", "A", "s", "n"], constrains="positive rate or count/time",
+                  seen_in=["Koufi", "Witbooi_Malaria", "DOI_10.26782_Mitra_2024"]),
+    ParameterRole(name="natural-mortality", label="Natural mortality / death rate",
+                  recognized_by="natural death / per-capita mortality (not disease-induced)",
+                  typical_symbols=["mu", "muH", "muV", "d"], constrains="small positive rate (1/time)",
+                  seen_in=["Dengue Infection OrnsteinUhlenbeck", "Malaria", "HBV"]),
+    ParameterRole(name="transmission", label="Transmission / infection / contact rate",
+                  recognized_by="rate of new infections / force of infection / contact rate",
+                  typical_symbols=["beta", "betaHV", "betaVH", "lambda", "lam"], constrains="positive rate",
+                  seen_in=["Dengue Infection OrnsteinUhlenbeck", "Malaria", "Koufi", "HBV"]),
+    ParameterRole(name="recovery", label="Recovery / clearance rate",
+                  recognized_by="rate of recovery / clearance from infectious state",
+                  typical_symbols=["gamma", "gammaH", "gamma1", "gamma2"], constrains="positive rate",
+                  seen_in=["Koufi", "Viral Infection"]),
+    ParameterRole(name="progression", label="Progression between stages",
+                  recognized_by="rate of moving between compartments (exposed→infectious, latent→active)",
+                  typical_symbols=["eta", "epsilon", "omega", "kappa"], constrains="positive rate",
+                  seen_in=["Koufi", "Chikungunya Virus", "Typhoid Fever Pneumonia"]),
+    ParameterRole(name="disease-mortality", label="Disease-induced death / virulence",
+                  recognized_by="extra mortality caused by the disease (beyond natural death)",
+                  typical_symbols=["delta", "alpha"], constrains="positive rate",
+                  seen_in=["Dengue Infection OrnsteinUhlenbeck", "HBV", "Witbooi_Malaria"]),
+    ParameterRole(name="noise-intensity", label="Noise intensity / diffusion coefficient",
+                  recognized_by="the σ on a Wiener/Brownian term — magnitude of the stochastic perturbation",
+                  typical_symbols=["sigma", "sigma1", "sigma2", "sigma3", "sigma4", "sigma5", "zeta", "xi"],
+                  constrains="non-negative; one per noisy equation/rate",
+                  seen_in=["Koufi", "Chikungunya Virus", "HBV", "Viral Infection", "Witbooi_Malaria"]),
+    ParameterRole(name="mean-reversion-rate", label="Mean-reversion rate (Ornstein–Uhlenbeck)",
+                  recognized_by="speed at which an OU process reverts to its mean (θ in dx=θ(x̄−x)dt+σdB)",
+                  typical_symbols=["theta"], constrains="positive rate",
+                  seen_in=["Dengue Infection OrnsteinUhlenbeck", "10_1007s00332.023_copy"]),
+    ParameterRole(name="reversion-level", label="OU long-run mean level",
+                  recognized_by="the x̄ an OU process reverts to (the long-run mean of the fluctuating parameter)",
+                  typical_symbols=["x_bar"], constrains="OFTEN NOT STATED — the canonical requires_inference absent",
+                  seen_in=["Dengue Infection OrnsteinUhlenbeck", "10_1007s00332.023_copy"]),
+    ParameterRole(name="intervention-rate", label="Intervention rate (vaccination / treatment / quarantine)",
+                  recognized_by="rate of a control: vaccination, treatment, quarantine, isolation",
+                  typical_symbols=["v1", "v2", "v3", "tau", "phi", "psi", "varpi"], constrains="non-negative rate",
+                  seen_in=["Typhoid Fever Pneumonia", "Koufi"]),
+    ParameterRole(name="waning", label="Waning immunity / relapse",
+                  recognized_by="loss of immunity / relapse back to susceptible or infectious",
+                  typical_symbols=["rho", "omega"], constrains="non-negative rate",
+                  seen_in=["Chikungunya Virus", "Typhoid Fever Pneumonia"]),
+    ParameterRole(name="within-host-rate", label="Within-host rate (production / clearance / burst)",
+                  recognized_by="within-host kinetics: virion production, cell infection, burst size, clearance",
+                  typical_symbols=["k", "c", "pi", "p", "a", "b"], constrains="positive",
+                  seen_in=["HBV", "Viral Infection", "Witbooi_Malaria"]),
+    ParameterRole(name="scaling", label="Carrying capacity / population size / scaling",
+                  recognized_by="a total population, carrying capacity, or scaling constant (not a rate)",
+                  typical_symbols=["K", "N", "NH", "n"], constrains="positive count/size",
+                  seen_in=["Cholera", "Malaria"]),
+]
+
+
+class ParameterClassification(BaseModel):
+    """A parameter sub-agent's identification + disposition for ONE symbol in the model.
+
+    `disposition` encodes Liz's three decisions directly: SKIP a non-parameter symbol, mark it
+    ABSENT (not stated / requires inference), or EXTRACT a stated value. The `role` says what KIND
+    of value to expect (constrains the search — guidance, not a hard bound). Value/meaning stay
+    present/absent Slots in schema.py; this never invents a value.
+    """
+
+    symbol: str
+    role: str                                  # a PARAMETER_ROLES name | "unclassified" | "not-a-parameter" | proposed
+    role_is_new: bool = False
+    disposition: Literal["extract", "skip", "absent_not_stated", "absent_requires_inference"] = "absent_not_stated"
+    evidence_quote: str = ""
+    evidence_page: Optional[int] = None
+    rationale: str = ""
+
+
+def match_parameter_role(name: str) -> Optional[ParameterRole]:
+    key = _norm(name)
+    for r in PARAMETER_ROLES:
+        if _norm(r.name) == key or _norm(r.label) == key:
+            return r
+    return None
+
+
+def trigger_parameter_candidate(
+    pc: ParameterClassification, *, paper_id: str, job_id: Optional[str] = None,
+) -> Optional[ClassificationCandidate]:
+    """Starred-track trigger for a NEW parameter role (same governed-add). 'skip'/'not-a-parameter'
+    is NOT a candidate — it's a deterministic skip, not an unknown classification."""
+    if pc.role_is_new or pc.role == "unclassified":
+        proposed = pc.role if pc.role_is_new else ""
+        return ClassificationCandidate(
+            kind="parameter_role", proposed_name=proposed, proposed_label=proposed,
+            evidence_quote=pc.evidence_quote, evidence_page=pc.evidence_page,
+            source_paper_id=paper_id, source_job_id=job_id, rationale=pc.rationale,
+        )
+    return None
+
+
+def parameter_registry_reference() -> str:
+    """Glossary handed to the parameter sub-agent prompt — generated from this single source."""
+    lines = ["Known parameter roles (classify each constant's ROLE from its stated meaning; the "
+             "role tells you what KIND of value to expect):"]
+    for r in PARAMETER_ROLES:
+        lines.append(f"- {r.name} — {r.label}. Recognize by: {r.recognized_by}. Symbols (convention): {', '.join(r.typical_symbols)}. Expect: {r.constrains}.")
+    lines.append("Disposition per symbol — SKIP if it is not a model parameter (an index, a function); "
+                 "ABSENT (not_stated / requires_inference) if it is a parameter but no value is stated "
+                 "(e.g. an OU x̄ that is never given); EXTRACT only a value written verbatim. Never invent.")
     return "\n".join(lines)
