@@ -36,6 +36,7 @@ export default defineConfig({
         {
           label: "Explanation — the why",
           items: [
+            { label: "The governing layers (the rule)", slug: "explanation/architecture" },
             { label: "The document-architecture canon", slug: "explanation/canon" },
             { label: "Present / absent", slug: "explanation/present-absent" },
             { label: "Provenance & lineage", slug: "explanation/provenance" },

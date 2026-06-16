@@ -42,29 +42,16 @@ re-check against the source themselves.
 
 ## The shape
 
-```
-   ┌─────────────────────────────────────────────────────────┐
-   │  1. SCHEMA + CLASSIFIERS   (define what everything is)   │  governs ↓
-   ├─────────────────────────────────────────────────────────┤
-   │  2. WORKFLOW   (exposes every true interface)            │  governs ↓
-   ├─────────────────────────────────────────────────────────┤
-   │  3. EACH INTERFACE is itself classified (typed)          │  governs ↓
-   ├─────────────────────────────────────────────────────────┤
-   │  4. EACH INTERFACE emits its record (the audit trail)    │
-   └─────────────────────────────────────────────────────────┘
-                              │  writes ONCE
-                              ▼
-            ┌───────────────────────────────────┐
-            │  5. ONE PERMANENT RECORD           │
-            │     • append-only, hash-chained    │
-            │     • inputs/outputs by fingerprint│
-            │     • kept indefinitely            │
-            └───────────────────────────────────┘
-                 │ read (never a 2nd write)
-                 ▼
-            ┌──────────────┐        a reviewer audits the RECORD,
-            │  LIVE UI      │  ===   not the screen — and they match
-            └──────────────┘        because they are the same data
+```mermaid
+flowchart TD
+  L1["1 · Schema + classifiers<br/>define what everything is"] --> L2
+  L2["2 · Workflow<br/>exposes every true interface"] --> L3
+  L3["3 · Each interface is itself classified (typed)"] --> L4
+  L4["4 · Each interface emits its record"] -->|writes once| REC
+  REC["5 · ONE permanent record<br/>append-only · hash-chained<br/>inputs/outputs by fingerprint · kept indefinitely"]
+  REC -->|"read (never a 2nd write)"| UI["Live UI"]
+  UI -. "matches — it reads the record" .-> REC
+  REV(["A reviewer audits the RECORD,<br/>not the screen"]) -.-> REC
 ```
 
 ## The non-negotiables
