@@ -104,17 +104,30 @@ These are the cross-cutting threads — useful for seeing how a piece of data co
 This is the working area. Add rows/notes as we go.
 
 - **METATAGS are not yet classified — the biggest gap (Liz, 2026-06-17).** The classifications above
-  are *content* (what a thing is scientifically). Separately we need **metatags**: the metadata every
-  piece carries that gives it **location**, lets it be **verified as true**, and makes it
-  **traceable**. These exist today only as scattered *fields*, never organized into a typed taxonomy:
-  - *traceable* — `file_sha256` (Provenance), verbatim quote + page (Present), the rect + `located`
-    flag (LocatorResult/locator), per-quote `span_sha256` (SpanProof/checksums_for).
-  - *verifiable as true* — present/absent + `AbsenceReason` (`not_stated` / `requires_inference`),
-    confidence tier (`exact / normalized / ambiguous / not_found`); the figure-repro oracle (not built).
-  - *location* — only page + rect; no higher-level location tag.
-  The metatags are likely where the graph's **location / distance** coordinate comes from — not the
-  content classifications. **Action: define a deliberate metatag classification (location /
-  verifiability / traceability tags), typed, that every piece carries.**
+  are *content* (what a thing is scientifically). Separately we need **metatags** — the practical
+  metadata that says *who/what made the data, where it lives, and what each piece is attached to*.
+  They are what give **location**, **verifiability**, **traceability**, and the **relationships**.
+  Two kinds, and we have neither properly:
+
+  **(1) Bibliographic / governance — who & what made the data (mostly MISSING; must be extracted off
+  the PDF):** author(s), domain, field, journal / governing source, affiliation, year, page, doi.
+  Today we only capture `title`, `doi`, `pathogen`, `page_count` (db.py:91) — no author/domain/field/
+  source/affiliation. Getting these is a NEW extraction step (read the title block / author list /
+  journal; infer domain & field).
+
+  **(2) Per-piece structural identity — each datum is its own thing (PARTIAL):** a stable id + what
+  it is attached to (which variable, which term) + its order/position + its source back-pointer
+  (page, quote, hash). Today this is only implicit in `field_path` (e.g. `parameters[5].value`,
+  `drift_terms[1].expression`; `Term.variable` ties a term to its variable) — not a first-class
+  per-piece metatag.
+
+  **Why it's the crux:** the structural metatags ("attached to variable X, term Y, order Z") ARE the
+  relationship substrate — pieces relate by shared variable / model / author / domain — and are the
+  most likely source of the graph's **location / distance** coordinate. Plus the proof metatags
+  already scattered as fields: traceable (`file_sha256`, quote+page, rect+`located`, `span_sha256`);
+  verifiable (present/absent + `AbsenceReason`; confidence tier `exact/normalized/ambiguous/not_found`;
+  figure-repro oracle — not built). **Action: define a deliberate metatag classification covering both
+  kinds, typed, that every piece carries.**
 - **Model structure is not yet a classification.** The variable roles already hint at four
   structures in the corpus — *population/compartmental (SIR-family)*, *within-host* (HBV, Viral),
   *host-vector* (Malaria), *environmental-reservoir* (Cholera, Typhoid `B`). Worth making this its
