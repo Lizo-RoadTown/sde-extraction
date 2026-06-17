@@ -32,6 +32,7 @@ export default defineConfig({
           label: "Start here",
           items: [
             { label: "Overview", slug: "index" },
+            { label: "Follow a paper, step by step", slug: "start/reproduce" },
             { label: "Reading this documentation", slug: "start/how-to-read" },
           ],
         },
