@@ -1,12 +1,12 @@
 ---
-title: SDE Extraction
-description: Rigorous documentation for automated extraction of stochastic-differential-equation epidemiological models from the literature into provable, present/absent structured models.
+title: Could you reproduce this model?
+description: A tool that reads a stochastic epidemiological model out of a paper and shows you, at every step, the evidence you'd need to verify and reproduce it yourself.
 template: splash
 hero:
-  tagline: Turning published epidemiological models into provable, machine-readable form — with every step observable and every value traced to its source.
+  tagline: You're judging whether a published stochastic epidemiological model holds up — and whether you could reproduce its results. This shows you the model it found, and the evidence behind every piece, step by step.
   actions:
-    - text: Start with the canon
-      link: /explanation/canon/
+    - text: Follow a paper, step by step
+      link: /tutorials/first-extraction/
       icon: right-arrow
     - text: How to read this
       link: /start/how-to-read/
@@ -15,28 +15,40 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## What this documents
+## Who this is for
 
-This is the reference record for a method that extracts **stochastic differential equation
-(SDE) epidemiological models** from academic papers into a **provable, structured form** —
-where every captured value is either present (transcribed verbatim from the paper, with its
-source) or explicitly absent, and every data hand-off is observable and provenance-tracked.
+You are a researcher evaluating a published model — does it hold up, and **could you reproduce its
+results?** This tool reads the stochastic (SDE) epidemiological model *out of* the paper and lays
+out, at every step, the evidence you would need to check it yourself.
 
-It is written to a single standard: **rigour**. Nothing here is asserted that is not
-substantiated by the system itself. Where a capability is planned but not yet verified, the
-page says so plainly rather than describing something that does not yet exist.
+**You don't need to know anything about programming or AI.** Everything here is about the model and
+about proof you can verify against the original paper.
+
+## What it does, in plain terms
+
+- It starts from a **figure** in the paper (a result) and works backward to the **model** behind it:
+  the equations, the variables, the parameters, and their starting values.
+- For **every value**, it shows the **exact quote and page** from the paper — so you can open the PDF
+  and confirm it with your own eyes. If the paper never states something, it says so plainly
+  ("not stated") instead of guessing.
+- It then **re-draws the figure from the extracted model**. If the re-drawn figure matches the
+  paper's, that is direct evidence the model was captured correctly.
+- **Every step is observable** — you can watch the data move and see the proof at each point, so the
+  whole path from paper to model is something you could follow and repeat.
+
+## Find what you need
 
 <CardGrid>
-  <Card title="Explanation" icon="open-book">
-    Why the method works the way it does — the canon, present/absent, provenance, observability.
+  <Card title="Follow a paper, step by step" icon="right-arrow">
+    Walk one paper from figure to model and see the evidence appear at every step.
   </Card>
-  <Card title="Reference" icon="list-format">
-    Exact definitions — the extraction schema, the database, the pipeline, targeting modes.
+  <Card title="Check a value yourself" icon="approve-check">
+    How each number traces to an exact quote and page in the original paper.
   </Card>
-  <Card title="How-to" icon="setting">
-    Task recipes — run the worker, apply migrations, add and verify a paper.
+  <Card title="Reproduce the results" icon="seti:image">
+    How the figure is re-drawn from the model — the reproduction test.
   </Card>
-  <Card title="Decisions" icon="approve-check">
-    The load-bearing architectural choices, recorded at the moment they were made.
+  <Card title="What 'not stated' means" icon="information">
+    Why a missing value is reported honestly instead of filled in.
   </Card>
 </CardGrid>

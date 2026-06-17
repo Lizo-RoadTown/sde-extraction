@@ -11,7 +11,7 @@ export default defineConfig({
   site: "https://sde-extraction-docs.vercel.app",
   integrations: [
     // astro-mermaid must precede starlight so ```mermaid blocks render as diagrams.
-    mermaid({ theme: "neutral" }),
+    mermaid({ theme: "dark" }),
     starlight({
       title: "SDE Extraction",
       description:

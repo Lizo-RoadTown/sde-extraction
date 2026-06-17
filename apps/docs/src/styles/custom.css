@@ -71,3 +71,21 @@ body {
     radial-gradient(120% 80% at 50% 120%, #5fd3da10 0%, transparent 60%),
     var(--sl-color-bg);
 }
+
+/* Callouts/asides get their OWN distinct semantic colors so a warning never looks like a diagram.
+   (note=teal, tip=sage, caution=amber, danger=rose — the app's six-role palette.) */
+.starlight-aside { border-radius: 8px; }
+.starlight-aside--note    { --sl-color-asides-text-accent: #6fa8ac; --sl-color-asides-border: #6fa8ac59; background: #6fa8ac12; }
+.starlight-aside--tip     { --sl-color-asides-text-accent: #8fa99b; --sl-color-asides-border: #8fa99b59; background: #8fa99b12; }
+.starlight-aside--caution { --sl-color-asides-text-accent: #d8b06a; --sl-color-asides-border: #d8b06a66; background: #d8b06a12; }
+.starlight-aside--danger  { --sl-color-asides-text-accent: #cf7f8a; --sl-color-asides-border: #cf7f8a66; background: #cf7f8a12; }
+
+/* Mermaid diagrams: seat them on the sunken well with a soft border so the dark-theme nodes read
+   clearly against the page, and keep diagram text legible. */
+.mermaid, [data-mermaid], pre.mermaid {
+  background: #0e1112;
+  border: 1px solid #2a2f31;
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+.mermaid svg { max-width: 100%; height: auto; }
