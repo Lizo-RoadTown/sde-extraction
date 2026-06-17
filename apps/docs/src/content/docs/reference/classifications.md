@@ -140,6 +140,21 @@ This is the working area. Add rows/notes as we go.
   figure-repro oracle — not built). **Action: define ONE uniform tag system — every dimension (role,
   family, noise_source, provenance, calculus, value-kind, category, domain, field, attached-to, …) a
   typed, classified, self-growing vocabulary that every piece carries.**
+
+  **Direction (researched 2026-06-17):** this is **faceted classification** (every dimension an
+  independent controlled-vocabulary facet) — the established convention for a narrow domain; govern
+  it with **SKOS-lite** semantics (preferred label, synonyms, broader/narrower/related). Avoid the
+  three anti-patterns: free "tag soup", heavyweight OWL ontologies, raw EAV.
+  - *Bibliographic facets* — pull from the **DOI via Crossref** (author/journal/year/affiliation),
+    with **ORCID** (author) + **ROR** (institution) embedded. DOI=work, ORCID=author, ROR=institution.
+  - *Domain/field* — **MeSH** (biomedical controlled vocab, synonym control) + **OECD Fields of Science** (coarse field).
+  - *Per-piece provenance* — the **nanopublication** model (claim + provenance + publication-info),
+    stored as plain **relational columns** (source, page, quote, hash, confidence, verified-by, attached-to, order), not RDF.
+  - *Storage* — Postgres **facet** + **concept** + **entity↔concept join** tables (FK integrity) +
+    `jsonb` extension points; Pydantic enforces the vocabulary. The candidate HITL track is how a
+    controlled vocabulary should grow.
+  - *Payoff* — the **tags are the graph's coordinate** (pieces relate by shared tags; the observatory
+    is a read-only projection of the tag data). OpenAI stays the brain (Postgres + Pydantic only).
 - **Model structure is not yet a classification.** The variable roles already hint at four
   structures in the corpus — *population/compartmental (SIR-family)*, *within-host* (HBV, Viral),
   *host-vector* (Malaria), *environmental-reservoir* (Cholera, Typhoid `B`). Worth making this its
