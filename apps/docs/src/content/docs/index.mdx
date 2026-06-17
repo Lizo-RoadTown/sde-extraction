@@ -1,9 +1,9 @@
 ---
 title: A shared standard for reproducible models
-description: An open, transparent way to make stochastic epidemiological models reproducible — read the model out of a paper and trace every value to its source, automatically, to the same standard for everyone.
+description: Read the stochastic model out of a paper and trace every value to its source, so you can check your own model or another paper against the same standard.
 template: splash
 hero:
-  tagline: A partner for high-quality, reproducible science. This reads the stochastic model out of a paper and shows the evidence behind every piece — so you can confirm your own model before you publish, or follow a colleague's, against one shared, transparent standard.
+  tagline: This reads the stochastic model out of a paper and shows where every value comes from, so you can check your own model before you publish, or follow a colleague's, against the same standard.
   actions:
     - text: Follow a paper, step by step
       link: /start/reproduce/
@@ -17,40 +17,34 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ## Who this is for
 
-Scientists and contributors who care about high standards in our research community. Whether you're
-**checking your own model before (or after) you publish**, or following a colleague's work, this
-gives everyone the **same transparent, automated way** to confirm a model reproduces — and to see
-exactly where every value came from.
+Scientists and contributors who work with stochastic epidemiological models. You can use it to check
+your own model before or after you publish, or to follow another paper's model. You do not need to
+know programming or AI. Everything here is about the model and the evidence you can check against the
+paper.
 
-It assumes the work is sound and helps you **show** it. You don't need to know anything about
-programming or AI — everything here is about the model and about evidence you can check against the
-original paper.
+## What it does
 
-## What it does, in plain terms
-
-- It starts from a **figure** in the paper (a result) and works backward to the **model** behind it:
-  the equations, the variables, the parameters, and their starting values.
-- For **every value**, it shows the **exact quote and page** from the paper — so anyone can confirm
-  it against the source. If the paper never states something, it says so plainly ("not stated")
-  rather than filling it in.
-- It then **re-draws the figure from the extracted model**. If the re-drawn figure matches, that's
-  shared evidence the model was captured faithfully.
-- **Every step is observable and recorded**, so the path from paper to model is transparent — the
-  same for your work and everyone else's.
+- It starts from a figure in the paper and finds the model behind it: the equations, variables,
+  parameters, and starting values.
+- For every value, it shows the exact quote and page from the paper, so you can confirm it against
+  the source. If the paper does not state a value, it says "not stated" instead of filling it in.
+- It re-draws the figure from the extracted model. If the re-drawn figure matches, the model
+  produces the same result.
+- Every step is observable and recorded.
 
 ## Find what you need
 
 <CardGrid>
   <Card title="Follow a paper, step by step" icon="right-arrow">
-    Walk one paper from figure to model and see the evidence appear at every step.
+    Walk one paper from figure to model and see the evidence at every step.
   </Card>
   <Card title="Check a value yourself" icon="approve-check">
     How each number traces to an exact quote and page in the original paper.
   </Card>
   <Card title="Reproduce the results" icon="seti:image">
-    How the figure is re-drawn from the model — reproduction as shared evidence.
+    How the figure is re-drawn from the model.
   </Card>
   <Card title="What 'not stated' means" icon="information">
-    Why a missing value is reported honestly instead of filled in.
+    Why a missing value is reported instead of filled in.
   </Card>
 </CardGrid>
