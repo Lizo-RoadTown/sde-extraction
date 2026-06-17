@@ -29,7 +29,7 @@ const NAV: { to: string; label: string; blurb: string }[] = [
 // falls back to the docs source on GitHub.
 const GITHUB_URL = "https://github.com/Lizo-RoadTown/sde-extraction";
 const DOCS_URL = (import.meta.env.VITE_DOCS_URL as string | undefined)
-  || "https://github.com/Lizo-RoadTown/sde-extraction/tree/main/apps/docs";
+  || "https://sde-extraction-jiow.vercel.app";
 
 function isActive(route: string, to: string): boolean {
   return to === "/" ? route === "/" : route === to || route.startsWith(to + "/");
