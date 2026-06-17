@@ -121,13 +121,25 @@ This is the working area. Add rows/notes as we go.
   `drift_terms[1].expression`; `Term.variable` ties a term to its variable) — not a first-class
   per-piece metatag.
 
+  **(3) The attributes ON the classifications are themselves metatags (Liz, 2026-06-17).** The
+  descriptive dimensions we attached inline — `noise_source` (a hardcoded Literal, classification.py:38),
+  `provenance` / `literature_verified`, `calculus_convention`, a parameter's value-kind (`constrains`,
+  currently FREE TEXT), and parameter **category/type** (missing) — are all tags too, and should each
+  be a first-class CLASSIFIED vocabulary, not an inline Literal/bool/string.
+
+  **The unifying principle:** *every descriptive dimension is a tag, and every tag should be its own
+  classified, controlled, self-growing vocabulary* (same treatment the roles get). "Content
+  classification" vs "metatag" is not a real split — **they are all tags.** We currently privilege a
+  few (roles, families) as proper registries and bury the rest as inline Literals/bools/free strings.
+
   **Why it's the crux:** the structural metatags ("attached to variable X, term Y, order Z") ARE the
   relationship substrate — pieces relate by shared variable / model / author / domain — and are the
   most likely source of the graph's **location / distance** coordinate. Plus the proof metatags
   already scattered as fields: traceable (`file_sha256`, quote+page, rect+`located`, `span_sha256`);
   verifiable (present/absent + `AbsenceReason`; confidence tier `exact/normalized/ambiguous/not_found`;
-  figure-repro oracle — not built). **Action: define a deliberate metatag classification covering both
-  kinds, typed, that every piece carries.**
+  figure-repro oracle — not built). **Action: define ONE uniform tag system — every dimension (role,
+  family, noise_source, provenance, calculus, value-kind, category, domain, field, attached-to, …) a
+  typed, classified, self-growing vocabulary that every piece carries.**
 - **Model structure is not yet a classification.** The variable roles already hint at four
   structures in the corpus — *population/compartmental (SIR-family)*, *within-host* (HBV, Viral),
   *host-vector* (Malaria), *environmental-reservoir* (Cholera, Typhoid `B`). Worth making this its
