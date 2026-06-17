@@ -47,6 +47,7 @@ export default defineConfig({
         {
           label: "Reference — the what",
           items: [
+            { label: "Classifications (running list)", slug: "reference/classifications" },
             { label: "Extraction schema", slug: "reference/schema" },
             { label: "Database schema", slug: "reference/database" },
             { label: "The worker pipeline", slug: "reference/pipeline" },
