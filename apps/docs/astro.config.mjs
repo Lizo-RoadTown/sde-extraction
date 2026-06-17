@@ -16,6 +16,8 @@ export default defineConfig({
       title: "SDE Extraction",
       description:
         "Rigorous documentation for the automated extraction of stochastic-differential-equation epidemiological models from the literature into provable, present/absent structured models.",
+      // Match the app's look (UX_CONTRACT): warm-black, Instrument Serif / Inter / JetBrains Mono.
+      customCss: ["./src/styles/custom.css"],
       social: [
         {
           icon: "github",
@@ -36,7 +38,6 @@ export default defineConfig({
         {
           label: "Explanation — the why",
           items: [
-            { label: "The governing layers (the rule)", slug: "explanation/architecture" },
             { label: "The document-architecture canon", slug: "explanation/canon" },
             { label: "Present / absent", slug: "explanation/present-absent" },
             { label: "Provenance & lineage", slug: "explanation/provenance" },
@@ -47,7 +48,6 @@ export default defineConfig({
         {
           label: "Reference — the what",
           items: [
-            { label: "Classifications (running list)", slug: "reference/classifications" },
             { label: "Extraction schema", slug: "reference/schema" },
             { label: "Database schema", slug: "reference/database" },
             { label: "The worker pipeline", slug: "reference/pipeline" },
@@ -68,10 +68,6 @@ export default defineConfig({
           items: [
             { label: "Extract your first paper", slug: "tutorials/first-extraction" },
           ],
-        },
-        {
-          label: "Decisions (ADRs)",
-          autogenerate: { directory: "decisions" },
         },
       ],
     }),

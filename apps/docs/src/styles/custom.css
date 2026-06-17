@@ -1,0 +1,73 @@
+/* Make the docs match the app (the UX_CONTRACT). Same palette + fonts as the dashboard's
+   index.css: warm near-black surfaces, desaturated semantics, one teal accent, Instrument Serif
+   for display, Inter for body, JetBrains Mono for code. Applied to BOTH themes so the docs always
+   read as the warm-black site regardless of the light/dark toggle. */
+
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  --sl-font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sl-font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+/* Warm-black palette mapped onto Starlight's base scale (the rest of Starlight's colors derive
+   from these). Set on both the default and the dark theme so the look is consistent everywhere. */
+:root,
+:root[data-theme="dark"] {
+  /* one teal accent, reserved + desaturated (brand #5fd3da / active #6fa8ac) */
+  --sl-color-accent-low: #14302f;
+  --sl-color-accent: #5fd3da;
+  --sl-color-accent-high: #a9e6ea;
+
+  /* text + surface scale (ink → faint → edge → panels → page) */
+  --sl-color-white: #f3f5f4;     /* ink (primary text / headings) */
+  --sl-color-gray-1: #e7ecea;
+  --sl-color-gray-2: #c4ccca;    /* ink-dim (body text) */
+  --sl-color-gray-3: #8b9492;    /* ink-faint (meta) */
+  --sl-color-gray-4: #4f5856;
+  --sl-color-gray-5: #2a2f31;    /* edge (borders/dividers) */
+  --sl-color-gray-6: #16191b;    /* surface-raised (cards/panels) */
+  --sl-color-black: #0a0d0e;     /* surface (page background) */
+
+  /* explicit derived overrides for the bits that matter most */
+  --sl-color-bg: #0a0d0e;
+  --sl-color-bg-nav: #0e1112;
+  --sl-color-bg-sidebar: #0e1112;
+  --sl-color-hairline: #2a2f31;
+  --sl-color-hairline-shade: #2a2f31;
+  --sl-color-text: #c4ccca;
+  --sl-color-text-accent: #6fa8ac;
+  color-scheme: dark;
+}
+
+/* Display face — Instrument Serif for headings + the site title, like the app's `display` class. */
+.site-title,
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.content-panel h1 {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+}
+
+/* Inline code in the warm amber (attention) the app uses for `mono` data, on a sunken well. */
+.sl-markdown-content code:not(pre code) {
+  color: #d8b06a;
+  background: #16191b;
+  border: 1px solid #2a2f31;
+  border-radius: 4px;
+}
+
+/* Code blocks sit in the inset well, with the edge border. */
+.sl-markdown-content pre {
+  background: #0e1112 !important;
+  border: 1px solid #2a2f31;
+}
+
+/* The signature: a soft teal bloom at the bottom of the page, matching the dashboard. */
+body {
+  background:
+    radial-gradient(120% 80% at 50% 120%, #5fd3da10 0%, transparent 60%),
+    var(--sl-color-bg);
+}
