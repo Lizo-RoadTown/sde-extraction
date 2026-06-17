@@ -1,9 +1,9 @@
 ---
-title: Could you reproduce this model?
-description: A tool that reads a stochastic epidemiological model out of a paper and shows you, at every step, the evidence you'd need to verify and reproduce it yourself.
+title: A shared standard for reproducible models
+description: An open, transparent way to make stochastic epidemiological models reproducible — read the model out of a paper and trace every value to its source, automatically, to the same standard for everyone.
 template: splash
 hero:
-  tagline: You're judging whether a published stochastic epidemiological model holds up — and whether you could reproduce its results. This shows you the model it found, and the evidence behind every piece, step by step.
+  tagline: A partner for high-quality, reproducible science. This reads the stochastic model out of a paper and shows the evidence behind every piece — so you can confirm your own model before you publish, or follow a colleague's, against one shared, transparent standard.
   actions:
     - text: Follow a paper, step by step
       link: /start/reproduce/
@@ -17,24 +17,26 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ## Who this is for
 
-You are a researcher evaluating a published model — does it hold up, and **could you reproduce its
-results?** This tool reads the stochastic (SDE) epidemiological model *out of* the paper and lays
-out, at every step, the evidence you would need to check it yourself.
+Scientists and contributors who care about high standards in our research community. Whether you're
+**checking your own model before (or after) you publish**, or following a colleague's work, this
+gives everyone the **same transparent, automated way** to confirm a model reproduces — and to see
+exactly where every value came from.
 
-**You don't need to know anything about programming or AI.** Everything here is about the model and
-about proof you can verify against the original paper.
+It assumes the work is sound and helps you **show** it. You don't need to know anything about
+programming or AI — everything here is about the model and about evidence you can check against the
+original paper.
 
 ## What it does, in plain terms
 
 - It starts from a **figure** in the paper (a result) and works backward to the **model** behind it:
   the equations, the variables, the parameters, and their starting values.
-- For **every value**, it shows the **exact quote and page** from the paper — so you can open the PDF
-  and confirm it with your own eyes. If the paper never states something, it says so plainly
-  ("not stated") instead of guessing.
-- It then **re-draws the figure from the extracted model**. If the re-drawn figure matches the
-  paper's, that is direct evidence the model was captured correctly.
-- **Every step is observable** — you can watch the data move and see the proof at each point, so the
-  whole path from paper to model is something you could follow and repeat.
+- For **every value**, it shows the **exact quote and page** from the paper — so anyone can confirm
+  it against the source. If the paper never states something, it says so plainly ("not stated")
+  rather than filling it in.
+- It then **re-draws the figure from the extracted model**. If the re-drawn figure matches, that's
+  shared evidence the model was captured faithfully.
+- **Every step is observable and recorded**, so the path from paper to model is transparent — the
+  same for your work and everyone else's.
 
 ## Find what you need
 
@@ -46,7 +48,7 @@ about proof you can verify against the original paper.
     How each number traces to an exact quote and page in the original paper.
   </Card>
   <Card title="Reproduce the results" icon="seti:image">
-    How the figure is re-drawn from the model — the reproduction test.
+    How the figure is re-drawn from the model — reproduction as shared evidence.
   </Card>
   <Card title="What 'not stated' means" icon="information">
     Why a missing value is reported honestly instead of filled in.

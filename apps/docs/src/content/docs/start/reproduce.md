@@ -3,10 +3,11 @@ title: Follow a paper, step by step
 description: Walk one paper from its figure to its model and see, at every step, the evidence you would need to verify and reproduce the result yourself.
 ---
 
-You are deciding whether a published stochastic epidemiological model holds up — and whether you
-could reproduce its results. This page follows **one paper** through the system from start to finish.
-At every step you see two things: **what the system did**, and **the evidence you can check yourself**
-against the original paper. You don't need to run anything or know anything about software.
+Whether you're confirming your **own** model before you publish, or following a colleague's work,
+this page walks **one paper** from its figure to its model. At every step you see two things: **what
+the system did**, and **the evidence anyone can check** against the original paper — the same
+transparent standard for everyone's work. You don't need to run anything or know anything about
+software.
 
 The whole idea: a result is only believable if you can trace it. So at each step the system shows
 its work, and the proof is kept so you can return to it later.
@@ -67,8 +68,8 @@ The system then **re-draws the figure using only the extracted model** — nothi
 image, just the equations and values it captured. If the re-drawn figure matches the paper's, that
 is the strongest possible evidence that the model is right.
 
-- **Why it matters:** anyone can transcribe symbols; *regenerating the result* is reproduction.
-  This is the test a skeptical reviewer actually wants.
+- **Why it matters:** anyone can transcribe symbols; *regenerating the result* is reproduction —
+  the evidence that lets everyone trust the model, including you, for your own work.
 
 ## 6 · Watch it happen — and the proof is kept
 
