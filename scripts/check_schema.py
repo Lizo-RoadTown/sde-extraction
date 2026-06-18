@@ -54,7 +54,7 @@ def main() -> int:
     print("[1/4] imports")
     # Pure-schema modules (only need pydantic) — these MUST import. processor only needs schema at
     # module load (openai/locator are lazy), so it surfaces FigurePanels-class name errors here.
-    for m in ("schema", "classification", "contracts", "facets", "processor"):
+    for m in ("schema", "classification", "contracts", "facets", "graph", "processor"):
         try_import(m)
     # Wiring modules — import if their deps exist; a bad NAME still fails (not skipped).
     for m in ("db", "hooks", "assemble", "locator", "worker"):
@@ -91,6 +91,18 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         fails.append(f"facets: {type(e).__name__}: {e}")
         print(f"  FAIL  facets: {e}")
+
+    try:
+        import graph as g
+        assert len(g.NODE_KINDS) > 0 and len(g.EDGE_TYPES) > 0, "graph vocabularies empty"
+        # every edge type has an endpoint spec, and validate_edge enforces allowed kinds
+        assert set(g.EDGE_ENDPOINTS) == set(g.EDGE_TYPES), "EDGE_ENDPOINTS != EDGE_TYPES"
+        assert g.validate_edge(g.GraphEdge(source="paper:1", target="model:1", type="contains"))
+        assert not g.validate_edge(g.GraphEdge(source="model:1", target="paper:1", type="contains"))
+        print(f"  ok    graph: {len(g.NODE_KINDS)} node kinds, {len(g.EDGE_TYPES)} edge types; edge validation works")
+    except Exception as e:  # noqa: BLE001
+        fails.append(f"graph: {type(e).__name__}: {e}")
+        print(f"  FAIL  graph: {e}")
 
     try:
         import classification as c
