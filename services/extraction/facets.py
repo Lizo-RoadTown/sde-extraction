@@ -19,6 +19,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 
 import classification as c
+from contracts import ConfidenceTier  # single source of truth (don't re-declare)
 
 
 FacetKind = Literal["content", "bibliographic", "structural", "proof"]
@@ -61,10 +62,12 @@ FACETS: list[Facet] = [
           description="publication year"),
     Facet(key="doi", label="DOI", kind="bibliographic", controlled=False,
           description="the work identifier"),
-    Facet(key="domain", label="Domain", kind="bibliographic",
-          description="subject domain (MeSH-derived)"),
-    Facet(key="field", label="Field", kind="bibliographic",
-          description="field of science (OECD Fields of Science)"),
+    # domain/field are FREE for now; they become controlled once the MeSH / OECD vocabularies are
+    # loaded (until then a controlled facet with no vocabulary would reject every value).
+    Facet(key="domain", label="Domain", kind="bibliographic", controlled=False,
+          description="subject domain (MeSH-derived once the MeSH vocabulary is loaded)"),
+    Facet(key="field", label="Field", kind="bibliographic", controlled=False,
+          description="field of science (OECD Fields of Science once that vocabulary is loaded)"),
     Facet(key="pathogen", label="Pathogen", kind="bibliographic", controlled=False,
           description="the disease / pathogen modelled"),
     # --- structural: each piece's identity + where it attaches ---
@@ -83,7 +86,7 @@ FACETS: list[Facet] = [
 VerificationStatus = Literal[
     "unverified", "located", "machine_verified", "figure_reproduced", "human_verified"
 ]
-ConfidenceTier = Literal["exact", "normalized", "ambiguous", "not_found"]
+# ConfidenceTier is imported from contracts.py (single source of truth) — see imports above.
 
 
 def facet(key: str) -> Optional[Facet]:
@@ -101,8 +104,8 @@ def concepts_for(facet_key: str) -> list[str]:
         "transformation": [t.name for t in c.TRANSFORMATIONS],
         "variable-role": [r.name for r in c.VARIABLE_ROLES],
         "parameter-role": [r.name for r in c.PARAMETER_ROLES],
-        "noise-source": ["demographic", "environmental", "either"],
-        "calculus-convention": ["ito", "stratonovich", "unspecified"],
+        "noise-source": list(c.NoiseSource.__args__),               # type: ignore[attr-defined]
+        "calculus-convention": list(c.CalculusConvention.__args__),  # type: ignore[attr-defined]
         "verification-status": list(VerificationStatus.__args__),  # type: ignore[attr-defined]
         "confidence-tier": list(ConfidenceTier.__args__),          # type: ignore[attr-defined]
     }.get(facet_key, [])
@@ -128,10 +131,10 @@ class Tag(BaseModel):
 
 
 def validate_tag(t: Tag) -> bool:
-    """A tag is valid if its facet exists, and (for a controlled facet) its value is in the
-    vocabulary, unless it is explicitly proposed as new (value_is_new)."""
+    """A tag is valid if its facet exists, has a non-empty value, and (for a controlled facet) its
+    value is in the vocabulary, unless it is explicitly proposed as new (value_is_new)."""
     f = facet(t.facet)
-    if f is None:
+    if f is None or not t.value.strip():
         return False
     if f.controlled and not t.value_is_new:
         return t.value in concepts_for(t.facet)
@@ -143,6 +146,10 @@ def facet_reference() -> str:
     lines = ["Facets every piece of data can be tagged along:"]
     for f in FACETS:
         vocab = concepts_for(f.key)
-        tail = f" (vocabulary: {', '.join(vocab)})" if vocab else " (free value)"
-        lines.append(f"- [{f.kind}] {f.key} — {f.label}: {f.description}.{tail if len(tail) < 160 else ''}")
+        if vocab:
+            shown = ", ".join(vocab[:8]) + (" ..." if len(vocab) > 8 else "")
+            tail = f" (vocabulary: {shown})"
+        else:
+            tail = " (free value)"
+        lines.append(f"- [{f.kind}] {f.key}: {f.label}. {f.description}.{tail}")
     return "\n".join(lines)
