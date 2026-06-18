@@ -42,6 +42,11 @@ export default defineConfig({
             { label: "What it recognizes", slug: "explanation/recognizes" },
             { label: "Where each value comes from", slug: "explanation/provenance" },
             { label: "The structured map", slug: "reference/schema" },
+          ],
+        },
+        {
+          label: "Watch it work",
+          items: [
             { label: "Watch it work", slug: "explanation/observability" },
           ],
         },
