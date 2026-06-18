@@ -54,7 +54,7 @@ def main() -> int:
     print("[1/4] imports")
     # Pure-schema modules (only need pydantic) — these MUST import. processor only needs schema at
     # module load (openai/locator are lazy), so it surfaces FigurePanels-class name errors here.
-    for m in ("schema", "classification", "contracts", "processor"):
+    for m in ("schema", "classification", "contracts", "facets", "processor"):
         try_import(m)
     # Wiring modules — import if their deps exist; a bad NAME still fails (not skipped).
     for m in ("db", "hooks", "assemble", "locator", "worker"):
@@ -78,6 +78,19 @@ def main() -> int:
         fails.append(f"construct schema models: {type(e).__name__}: {e}")
         print(f"  FAIL  construct schema models: {e}")
         fx = None
+
+    try:
+        import facets as fc
+        assert len(fc.FACETS) > 0, "FACETS is empty"
+        # a controlled tag with a real concept validates; a bogus value does not
+        assert fc.validate_tag(fc.Tag(facet="model-family", value="levy-jump"))
+        assert not fc.validate_tag(fc.Tag(facet="model-family", value="nope"))
+        assert fc.validate_tag(fc.Tag(facet="author", value="Smith J"))  # free facet
+        assert fc.validate_tag(fc.Tag(facet="model-family", value="brand-new", value_is_new=True))
+        print(f"  ok    facets: {len(fc.FACETS)} facets; tag validation works")
+    except Exception as e:  # noqa: BLE001
+        fails.append(f"facets: {type(e).__name__}: {e}")
+        print(f"  FAIL  facets: {e}")
 
     try:
         import classification as c
