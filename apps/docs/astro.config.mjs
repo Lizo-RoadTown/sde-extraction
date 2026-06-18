@@ -30,6 +30,7 @@ export default defineConfig({
         {
           label: "Start here",
           items: [
+            { label: "Open the app ↗", link: "https://sde-extraction.vercel.app/", attrs: { target: "_blank", rel: "noreferrer" } },
             { label: "Overview", slug: "index" },
             { label: "Follow a paper, step by step", slug: "start/reproduce" },
             { label: "How to read this", slug: "start/how-to-read" },
