@@ -92,6 +92,8 @@ def run(
         model = _stub_extraction(figure_label)
         return {"model": model, "checksums": {}}
 
+    import base64
+
     from openai import OpenAI  # imported lazily so dry-run needs no openai install
 
     client = OpenAI()  # reads OPENAI_API_KEY
@@ -99,14 +101,39 @@ def run(
     try:
         with open(pdf_path, "rb") as f:
             uploaded = client.files.create(file=f, purpose="user_data")
+
+        # Figure isolation (deterministic, no LLM): crop the ONE target figure and attach it as the
+        # ANCHOR so "the figure" is unambiguous. The PDF stays attached for the body text where the
+        # machinery (values/params) lives. Falls back to whole-PDF if nothing is detected — honest seam.
+        mode = (target or {}).get("mode", "auto")
+        content: list[dict[str, Any]] = [{"type": "input_file", "file_id": uploaded.id}]
+        figure_provenance: Optional[dict[str, Any]] = None
+        instruction = _target_instruction(target)
+        if mode in ("figure", "auto"):
+            try:
+                from figures import isolate_figure
+                label = target.get("figure_ref") if mode == "figure" else None
+                iso = isolate_figure(pdf_path, label=label)
+            except Exception:  # noqa: BLE001 — isolation is best-effort; never block extraction
+                iso = None
+            if iso:
+                data_url = "data:image/png;base64," + base64.b64encode(iso["png"]).decode()
+                content.append({"type": "input_image", "image_url": data_url})
+                figure_provenance = iso["provenance"].model_dump()
+                shown = iso["region"].label or "the detected figure"
+                instruction = (
+                    f"The attached IMAGE is the target figure ({shown}, page {iso['region'].page}), "
+                    f"isolated from the PDF. Extract the SDE model behind THIS figure only. Search the "
+                    f"PDF text for its machinery (variables, parameters, values, drift/diffusion), "
+                    f"present/absent each per the rules."
+                )
+        content.append({"type": "input_text", "text": instruction})
+
         response = client.responses.parse(
             model=MODEL,
             input=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": [
-                    {"type": "input_file", "file_id": uploaded.id},
-                    {"type": "input_text", "text": _target_instruction(target)},
-                ]},
+                {"role": "user", "content": content},
             ],
             text_format=FigureExtraction,
         )
@@ -116,7 +143,10 @@ def run(
         # verify it's truly verbatim. Annotates the model in place (slot['rect'], slot['located']).
         from locator import annotate_locations
         model, locations = annotate_locations(pdf_path, model)
-        return {"model": model, "checksums": checksums_for(result), "locations": locations}
+        out: dict[str, Any] = {"model": model, "checksums": checksums_for(result), "locations": locations}
+        if figure_provenance:
+            out["figure_provenance"] = figure_provenance
+        return out
     finally:
         try:
             os.remove(pdf_path)

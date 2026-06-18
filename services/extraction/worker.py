@@ -99,6 +99,9 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
 
         db.update_job(conn, job_id, stage="machine_verify", progress=0.8)
         model = {**result["model"], "_checksums": result["checksums"]}
+        fig_prov = result.get("figure_provenance")
+        if fig_prov:
+            model["_figure_provenance"] = fig_prov  # which figure was isolated: page/bbox/tool/dual SHA
         pid = str(job["paper_id"])
         # Hooks (best-effort telemetry → validation_events): the extract + locate stages.
         locs = result.get("locations") or {}
@@ -114,6 +117,14 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
                    outcome="pass" if locs.get("located") else "flag",
                    job_id=job_id, paper_id=pid, thread_id=job_id,
                    subject_id="locator:pdfplumber", tags={**intake, **locs})
+        # Figure isolation seam (deterministic): which single figure anchored this extraction.
+        hooks.emit(conn, point="isolate", subject_kind="script",
+                   outcome="pass" if fig_prov else "skip",
+                   job_id=job_id, paper_id=pid, thread_id=job_id,
+                   subject_id="figures:pymupdf",
+                   tags={**intake, **({"page": fig_prov.get("page"), "label": fig_prov.get("label"),
+                                       "image_sha256": (fig_prov.get("image_sha256") or "")[:16]}
+                                      if fig_prov else {})})
         # The figure is the anchor — record WHICH figure was extracted. 'auto' means the engine
         # chose; store its choice (the model's own figure_label), not the '(auto)' placeholder.
         figure = (model.get("figure_label") or "").strip() or figure_label or "(figure)"

@@ -54,7 +54,7 @@ def main() -> int:
     print("[1/4] imports")
     # Pure-schema modules (only need pydantic) — these MUST import. processor only needs schema at
     # module load (openai/locator are lazy), so it surfaces FigurePanels-class name errors here.
-    for m in ("schema", "classification", "contracts", "facets", "graph", "processor"):
+    for m in ("schema", "classification", "contracts", "facets", "graph", "figures", "processor"):
         try_import(m)
     # Wiring modules — import if their deps exist; a bad NAME still fails (not skipped).
     for m in ("db", "hooks", "assemble", "locator", "worker"):
@@ -108,6 +108,17 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         fails.append(f"graph: {type(e).__name__}: {e}")
         print(f"  FAIL  graph: {e}")
+
+    try:
+        import figures as fig
+        assert fig.norm_label("Figure 2") == "2" and fig.norm_label("FIG. 3a") == "3a"
+        assert fig.CAPTION.search("see Figure 12 for details") is not None
+        r = fig.FigureRegion(page=1, bbox=(0, 0, 10, 10), bbox_norm=(0, 0, 0.1, 0.1), area=100.0)
+        fig.FigureProvenance(tool="pymupdf", page=1, bbox=r.bbox, bbox_norm=r.bbox_norm, scale=2.0)
+        print("  ok    figures: caption/label parse + region/provenance models construct")
+    except Exception as e:  # noqa: BLE001
+        fails.append(f"figures: {type(e).__name__}: {e}")
+        print(f"  FAIL  figures: {e}")
 
     try:
         import classification as c
