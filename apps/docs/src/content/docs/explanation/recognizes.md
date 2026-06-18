@@ -7,6 +7,12 @@ The system is built for stochastic epidemiological models. It recognizes the com
 and the common roles each part can play, so it knows what a symbol means even when different papers
 use the same letter for different things.
 
+What it recognizes is a library of knowledge that grows. The lists below are what it knows so far.
+When a paper brings a kind of model or a role that is not yet in the library, a reviewer confirms it
+and it is added, so the library widens as more papers come through. For the parts it knows so far, you
+can see how sure it is on each one in [Watch it work](/explanation/observability/), where every part
+of the process reports its own confidence.
+
 ## How randomness enters the model
 
 | Kind | What it means |
