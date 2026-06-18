@@ -2,12 +2,16 @@
 -- Two READ-ONLY views the UI reads directly: graph_node + graph_edge. Nothing computes the graph on
 -- the fly; this IS the projection over papers / extractions / entity_tag. Additive, no new state.
 --
--- What projects TODAY (from columns that already exist): paper -> model (contains), model -> pathogen
--- (about-pathogen), model -> model-family (has-family). The entity_tag branches (roles, authors,
--- attached-to, ...) are correct but empty until the tag producer writes entity_tag rows, and until
--- variables/parameters are surfaced from extractions.model jsonb as their own nodes.
+-- What projects TODAY (from data that already exists): paper -> model (contains), model -> pathogen
+-- (about-pathogen), model -> model-family (has-family), and the backbone pieces
+-- variable/parameter -> model (attached-to), expanded from extractions.model jsonb. The shared-node
+-- branches (roles, authors, domain/field) are correct but empty until the tag producer writes
+-- entity_tag rows.
 --
 -- node id convention: '<kind>:<key>'  (e.g. 'pathogen:dengue', 'model:<uuid>'). Mirrors graph.py.
+-- A backbone piece is keyed per-model: 'variable:<extraction_id>:<symbol>'. So for a future has-role
+-- edge to connect, the producer must write entity_tag with entity_kind='variable'|'parameter' and
+-- entity_id='<extraction_id>:<symbol>' (then entity_kind||':'||entity_id == the node id here).
 
 create or replace view graph_node as
   -- backbone: papers
@@ -19,6 +23,24 @@ create or replace view graph_node as
   select 'model:'  || e.id::text          as id, 'model'  as kind,
          coalesce(nullif(e.figure_label, ''), 'model') as label
     from extractions e
+  union
+  -- backbone pieces: variables, expanded from the model jsonb (one per (model, symbol))
+  select distinct 'variable:' || e.id::text || ':' || (v->>'symbol'), 'variable',
+         coalesce(nullif(v->>'symbol', ''), 'variable')
+    from extractions e,
+         lateral jsonb_array_elements(
+           case when jsonb_typeof(e.model->'variables') = 'array' then e.model->'variables' else '[]'::jsonb end
+         ) v
+   where coalesce(v->>'symbol', '') <> ''
+  union
+  -- backbone pieces: parameters, expanded from the model jsonb (one per (model, symbol))
+  select distinct 'parameter:' || e.id::text || ':' || (p->>'symbol'), 'parameter',
+         coalesce(nullif(p->>'symbol', ''), 'parameter')
+    from extractions e,
+         lateral jsonb_array_elements(
+           case when jsonb_typeof(e.model->'parameters') = 'array' then e.model->'parameters' else '[]'::jsonb end
+         ) p
+   where coalesce(p->>'symbol', '') <> ''
   union
   -- shared-dimension nodes that already exist as columns
   select distinct 'pathogen:' || e.pathogen, 'pathogen', e.pathogen
@@ -46,6 +68,22 @@ create or replace view graph_edge as
   -- model has family
   select 'model:' || e.id::text, 'model-family:' || e.formulation_family, 'has-family'
     from extractions e where e.formulation_family is not null and e.formulation_family <> ''
+  union all
+  -- backbone: each variable attached to its model
+  select 'variable:' || e.id::text || ':' || (v->>'symbol'), 'model:' || e.id::text, 'attached-to'
+    from extractions e,
+         lateral jsonb_array_elements(
+           case when jsonb_typeof(e.model->'variables') = 'array' then e.model->'variables' else '[]'::jsonb end
+         ) v
+   where coalesce(v->>'symbol', '') <> ''
+  union all
+  -- backbone: each parameter attached to its model
+  select 'parameter:' || e.id::text || ':' || (p->>'symbol'), 'model:' || e.id::text, 'attached-to'
+    from extractions e,
+         lateral jsonb_array_elements(
+           case when jsonb_typeof(e.model->'parameters') = 'array' then e.model->'parameters' else '[]'::jsonb end
+         ) p
+   where coalesce(p->>'symbol', '') <> ''
   union all
   -- tag-driven edges: a tagged piece -> the shared-dimension node it points at.
   -- entity_tag.entity_kind/entity_id name the source node; facet_key picks the edge type.

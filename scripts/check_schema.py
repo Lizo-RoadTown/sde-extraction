@@ -99,7 +99,12 @@ def main() -> int:
         assert set(g.EDGE_ENDPOINTS) == set(g.EDGE_TYPES), "EDGE_ENDPOINTS != EDGE_TYPES"
         assert g.validate_edge(g.GraphEdge(source="paper:1", target="model:1", type="contains"))
         assert not g.validate_edge(g.GraphEdge(source="model:1", target="paper:1", type="contains"))
-        print(f"  ok    graph: {len(g.NODE_KINDS)} node kinds, {len(g.EDGE_TYPES)} edge types; edge validation works")
+        # the per-piece composite id 'variable:<extraction_id>:<symbol>' must still read as kind 'variable'
+        # (migration 0010's jsonb branches depend on this — kind is the prefix before the FIRST colon)
+        assert g.kind_of("variable:abc-123:S") == "variable"
+        assert g.validate_edge(g.GraphEdge(source="variable:abc-123:S", target="model:abc-123", type="attached-to"))
+        assert not g.validate_edge(g.GraphEdge(source="model:abc-123", target="variable:abc-123:S", type="attached-to"))
+        print(f"  ok    graph: {len(g.NODE_KINDS)} node kinds, {len(g.EDGE_TYPES)} edge types; edge + composite-id validation works")
     except Exception as e:  # noqa: BLE001
         fails.append(f"graph: {type(e).__name__}: {e}")
         print(f"  FAIL  graph: {e}")
