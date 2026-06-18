@@ -27,6 +27,9 @@ from pydantic import BaseModel
 
 # A figure caption: "Fig 2", "Figure 3a", "FIG. 12". The number(+optional letter) is the label key.
 CAPTION = re.compile(r"\b(?:fig(?:ure)?\.?)\s*([0-9]{1,3}[a-z]?)\b", re.IGNORECASE)
+# A REAL caption block STARTS with the figure label ("Fig. 2. ...", "Figure 3: ..."). Anchoring to
+# the block start rejects in-text references ("see Fig 2") so they never become phantom figures.
+CAPTION_START = re.compile(r"^\s*(?:fig(?:ure)?\.?)\s*([0-9]{1,3}[a-z]?)\b", re.IGNORECASE)
 
 MAX_SCALE = 4.0   # crop-don't-crank guard: clamp rasterization scale so we never blast DPI
 MERGE_GAP = 24.0  # points; sub-panels/images closer than this merge into ONE figure region
@@ -117,50 +120,100 @@ def _merge_rects(rects: list, gap: float = MERGE_GAP) -> list:
 
 
 def _captions(page) -> list:
-    """(label, rect, text) for each text block that looks like a figure caption."""
+    """(label, rect, text) for each text block that STARTS with a figure-caption label. Block-start
+    anchoring rejects in-text references ('see Fig 2') so they never become phantom figures."""
     import fitz
     out = []
     for block in page.get_text("blocks"):
         x0, y0, x1, y1, text = block[0], block[1], block[2], block[3], block[4]
-        m = CAPTION.search(text or "")
+        m = CAPTION_START.match(text or "")
         if m:
             out.append((f"Figure {m.group(1)}", fitz.Rect(x0, y0, x1, y1), (text or "").strip()[:200]))
     return out
 
 
 def _nearest_caption(region, captions):
-    """The caption directly below the region (typical) else the closest by center distance."""
-    below = [c for c in captions if c[1].y0 >= region.y1 - 4 and c[1].x1 > region.x0 and c[1].x0 < region.x1]
+    """The caption directly below the region (typical) else the closest by center distance.
+    Returns (label, text, index) so the caller can mark that caption as claimed by a raster figure."""
+    below = [(i, c) for i, c in enumerate(captions)
+             if c[1].y0 >= region.y1 - 4 and c[1].x1 > region.x0 and c[1].x0 < region.x1]
     if below:
-        c = min(below, key=lambda c: c[1].y0 - region.y1)
-        return c[0], c[2]
+        i, c = min(below, key=lambda ic: ic[1][1].y0 - region.y1)
+        return c[0], c[2], i
     if captions:
         rcx, rcy = (region.x0 + region.x1) / 2, (region.y0 + region.y1) / 2
-        c = min(captions, key=lambda c: ((c[1].x0 + c[1].x1) / 2 - rcx) ** 2 + ((c[1].y0 + c[1].y1) / 2 - rcy) ** 2)
-        return c[0], c[2]
-    return None, None
+        i, c = min(enumerate(captions),
+                   key=lambda ic: ((ic[1][1].x0 + ic[1][1].x1) / 2 - rcx) ** 2
+                   + ((ic[1][1].y0 + ic[1][1].y1) / 2 - rcy) ** 2)
+        return c[0], c[2], i
+    return None, None, None
+
+
+def _caption_region(page, crect, captions, drawing_rects):
+    """Bound a VECTOR figure by the REAL drawn content above its caption. The caption anchors WHERE a
+    figure is; the actual vector drawings give its extent. Returns a fitz.Rect, or None when nothing
+    is drawn above the caption (honest 'no figure' — never a fabricated box over body text)."""
+    import fitz
+    pw = float(page.rect.width)
+    # the band above this caption, not crossing another caption above it (that's a different figure)
+    above = [c[1].y1 for c in captions if c[1].y1 <= crect.y0 - 2]
+    band_top = max(above) if above else 0.0
+    band_bottom = crect.y0
+    sel = [r for r in drawing_rects
+           if band_top <= (r.y0 + r.y1) / 2 <= band_bottom and (r.width >= 1 or r.height >= 1)]
+    if not sel:
+        return None  # nothing actually drawn above the caption -> don't invent a figure
+    u = fitz.Rect(sel[0])
+    for r in sel[1:]:
+        u |= r
+    u = u & fitz.Rect(0, band_top, pw, band_bottom)  # clamp to the band, above the caption text
+    if u.is_empty or u.width < 24 or u.height < 24:
+        return None
+    return u
 
 
 def detect_figures(pdf_path: str) -> list[FigureRegion]:
-    """All figure regions in the PDF — merged image clusters, each labelled by its nearest caption."""
+    """All figure regions in the PDF. RASTER figures come from embedded-image clusters; VECTOR figures
+    (line plots) are anchored by their caption and bounded by the real drawings above it. Labelled by
+    caption. No ranking, no auto-pick — every figure is surfaced for the human to choose."""
     import fitz
     regions: list[FigureRegion] = []
     doc = fitz.open(pdf_path)
     try:
         for pno in range(len(doc)):
             page = doc[pno]
-            clusters = _merge_rects(_image_rects(page))
-            captions = _captions(page)
             pw, ph = float(page.rect.width), float(page.rect.height)
             if pw <= 0 or ph <= 0:
                 continue
+            captions = _captions(page)
+            clusters = _merge_rects(_image_rects(page))
+            claimed: set[int] = set()
+            # raster figures (embedded images)
             for c in clusters:
-                label, cap = _nearest_caption(c, captions)
+                label, cap, ci = _nearest_caption(c, captions)
+                if ci is not None:
+                    claimed.add(ci)
                 regions.append(FigureRegion(
                     page=pno + 1,
                     bbox=(c.x0, c.y0, c.x1, c.y1),
                     bbox_norm=(c.x0 / pw, c.y0 / ph, c.x1 / pw, c.y1 / ph),
                     label=label, caption=cap, area=c.get_area(), source="image",
+                ))
+            # vector figures: each remaining caption, bounded by the real drawings above it
+            drawing_rects: Optional[list] = None
+            for ci, (label, crect, ctext) in enumerate(captions):
+                if ci in claimed:
+                    continue
+                if drawing_rects is None:
+                    drawing_rects = [fitz.Rect(d["rect"]) for d in page.get_drawings()]
+                u = _caption_region(page, crect, captions, drawing_rects)
+                if u is None:
+                    continue
+                regions.append(FigureRegion(
+                    page=pno + 1,
+                    bbox=(u.x0, u.y0, u.x1, u.y1),
+                    bbox_norm=(u.x0 / pw, u.y0 / ph, u.x1 / pw, u.y1 / ph),
+                    label=label, caption=ctext, area=u.get_area(), source="vector",
                 ))
     finally:
         doc.close()
