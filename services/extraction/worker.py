@@ -76,6 +76,34 @@ def _signed_pdf_url(paper: dict, dry_run: bool) -> str | None:
         return None
 
 
+def _detect_figures(conn, job_id: str, paper_id: str, paper: dict, intake: dict, *, dry_run: bool) -> None:
+    """Detect job (target.mode == 'detect'): run the SAME server-side PyMuPDF detector used for
+    extraction and store the regions for the human chooser. No extraction, no ranking — the human
+    picks from these and the pick drives a normal figure-mode extraction."""
+    import figures as F
+    from processor import _download
+
+    db.update_job(conn, job_id, stage="extract", progress=0.4)
+    figs: list = []
+    pdf_url = _signed_pdf_url(paper, dry_run)
+    if pdf_url:
+        path = _download(pdf_url)
+        try:
+            figs = F.detect_serializable(path)
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    db.set_detected_figures(conn, paper_id, figs)
+    db.update_job(conn, job_id, stage="stored", progress=1.0)
+    hooks.emit(conn, point="detect", subject_kind="script",
+               outcome="pass" if figs else "flag",
+               job_id=job_id, paper_id=paper_id, thread_id=job_id,
+               subject_id="figures:pymupdf", tags={**intake, "n_figures": len(figs)})
+    print(f"job {job_id}: detected {len(figs)} figure(s) for paper {paper_id}")
+
+
 def process_one(conn, job: dict, *, dry_run: bool) -> None:
     job_id = str(job["id"])
     figure_label = job.get("figure_label") or ""
@@ -88,6 +116,9 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
     print(f"job {job_id}: extracting (figure={figure_label!r}, mode={target.get('mode')})")
     try:
         paper = db.get_paper(conn, str(job["paper_id"])) or {}
+        if (target or {}).get("mode") == "detect":
+            _detect_figures(conn, job_id, str(job["paper_id"]), paper, intake, dry_run=dry_run)
+            return
         db.update_job(conn, job_id, stage="extract", progress=0.4)
         pdf_url = _signed_pdf_url(paper, dry_run)
 

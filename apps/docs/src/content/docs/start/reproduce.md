@@ -18,8 +18,8 @@ flowchart LR
 
 ## 1. You choose one figure
 
-You pick the single graph you care about. The system shows the model that figure came from: the
-equations behind it.
+The system finds the figures in the paper and shows them. You pick the single graph you care about.
+The system then shows the model that figure came from: the equations behind it.
 
 ## 2. The figure identifies the variables
 

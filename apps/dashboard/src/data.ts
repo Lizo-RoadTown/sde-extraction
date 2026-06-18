@@ -132,10 +132,33 @@ function rowToExtraction(row: Record<string, unknown>): FigureExtraction {
 // The Intake targeting choice that rides on a queued job (the worker's processor
 // branches on target.mode — services/extraction/processor.py).
 export interface JobTarget {
-  mode: "auto" | "figure" | "model" | "whole";
+  mode: "auto" | "figure" | "model" | "whole" | "detect";
   figure_ref?: string;
   model_desc?: string;
   lane?: "walkthrough" | "bulk"; // which audience lane enqueued it (the worker copies it to the extraction)
+}
+
+// A figure the server-side detector (PyMuPDF) found in the paper — what the human chooses from.
+// Stored on papers.detected_figures by a 'detect' job (migration 0011). The chooser renders the crop
+// from the PDF to bbox_norm; picking one drives a figure-mode extraction by label.
+export interface DetectedFigure {
+  label: string | null;
+  caption: string | null;
+  page: number;
+  bbox: [number, number, number, number];
+  bbox_norm: [number, number, number, number];
+}
+
+/** The figures the detect job found for a paper (null until the detect job has stored them). */
+export async function loadDetectedFigures(paperId: string): Promise<DetectedFigure[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("papers")
+    .select("detected_figures")
+    .eq("id", paperId)
+    .single();
+  if (error || !data) { if (error) console.error("loadDetectedFigures:", error.message); return null; }
+  return (data.detected_figures as DetectedFigure[] | null) ?? null;
 }
 
 /**

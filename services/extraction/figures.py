@@ -180,6 +180,17 @@ def rasterize_region(pdf_path: str, region: FigureRegion, scale: float = 2.0) ->
         doc.close()
 
 
+def detect_serializable(pdf_path: str) -> list[dict]:
+    """Detected regions as plain dicts for storage + the human chooser (no LLM, no ranking).
+    The chooser renders each region cropped from the PDF to bbox_norm; a pick drives figure-mode
+    extraction by label (isolate_figure(label=...) re-finds the same region — one detector, no drift)."""
+    return [
+        {"label": r.label, "caption": r.caption, "page": r.page,
+         "bbox": list(r.bbox), "bbox_norm": list(r.bbox_norm)}
+        for r in detect_figures(pdf_path)
+    ]
+
+
 def isolate_figure(pdf_path: str, *, label: Optional[str] = None, scale: float = 2.0) -> Optional[dict]:
     """Isolate ONE figure -> {png, region, provenance}. Picks the label-matched region if `label` is
     given, else the largest-area region (the paper's primary figure). Returns None if none detected."""

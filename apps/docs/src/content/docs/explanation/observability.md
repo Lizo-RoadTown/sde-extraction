@@ -18,7 +18,7 @@ flowchart LR
   F --> G["Person<br/>reviews it"]
 ```
 
-1. The paper is added and a figure is chosen.
+1. The paper is added; the system finds its figures and you choose one.
 2. The variables are identified from the figure.
 3. The parameters are matched to the figure.
 4. Each value is lifted from the paper with its source.

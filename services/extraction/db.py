@@ -95,6 +95,17 @@ def get_paper(conn: psycopg.Connection, paper_id: str) -> Optional[dict[str, Any
         return cur.fetchone()
 
 
+def set_detected_figures(conn: psycopg.Connection, paper_id: str, figures: list[dict[str, Any]]) -> None:
+    """Store the detected figure regions (migration 0011). The human chooser reads these to show
+    real figure crops; the human picks one. Server-side detection only — no client guessing."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "update papers set detected_figures = %s where id = %s",
+            (json.dumps(figures), paper_id),
+        )
+        conn.commit()
+
+
 def record_validation_event(
     conn: psycopg.Connection,
     *,

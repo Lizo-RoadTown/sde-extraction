@@ -4,7 +4,7 @@ description: The steps to add a paper, run the extraction, and check the result 
 ---
 
 1. Add the paper. Upload the PDF. It is fingerprinted on upload and stored.
-2. Choose the figure. Pick the single figure you want the model for.
+2. Choose the figure. The system finds the figures in the paper and shows them; you pick the single one you want the model for.
 3. Run it. The system reads the model behind that figure.
 4. Check it. When the result is ready, open it and check each value against its source in the paper.
    Confirm it, or send it back.
