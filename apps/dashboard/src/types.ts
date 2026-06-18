@@ -62,6 +62,14 @@ export interface FigureExtraction {
   status: ExtractionStatus;
   pdfUrl: string;
   storagePath?: string; // the paper's storage path → signed PDF URL (the journey renders the real page)
+  // The figure the worker ISOLATED (server-side PyMuPDF) — page + normalized bbox, so the UI can
+  // render the actual figure crop from the PDF (the "paper" side of the figure-compare oracle).
+  figureProvenance?: {
+    page: number;
+    bboxNorm: [number, number, number, number];
+    label?: string;
+    caption?: string;
+  };
   // --- what the figure required: each present/absent, with meaning ---
   variables: Variable[];
   parameters: Parameter[];

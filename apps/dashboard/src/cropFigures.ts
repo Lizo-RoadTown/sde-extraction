@@ -14,6 +14,44 @@ export interface FigureThumb extends DetectedFigure {
 
 const RENDER_SCALE = 2; // 2x for a crisp crop; we clip to the region, we don't crank DPI on the page
 
+// Crop one region from an already-rendered page canvas to a data URL (top-left-origin fractions).
+function cropToDataUrl(pageCanvas: HTMLCanvasElement, bboxNorm: [number, number, number, number]): string | undefined {
+  const [x0, y0, x1, y1] = bboxNorm;
+  const cx = Math.max(0, Math.floor(x0 * pageCanvas.width));
+  const cy = Math.max(0, Math.floor(y0 * pageCanvas.height));
+  const cw = Math.min(pageCanvas.width - cx, Math.ceil((x1 - x0) * pageCanvas.width));
+  const ch = Math.min(pageCanvas.height - cy, Math.ceil((y1 - y0) * pageCanvas.height));
+  if (cw <= 0 || ch <= 0) return undefined;
+  const crop = document.createElement("canvas");
+  crop.width = cw;
+  crop.height = ch;
+  const cctx = crop.getContext("2d");
+  if (!cctx) return undefined;
+  cctx.drawImage(pageCanvas, cx, cy, cw, ch, 0, 0, cw, ch);
+  return crop.toDataURL("image/png");
+}
+
+// Render ONE isolated figure from a PDF URL (the figure-compare "paper" side). Same display-only
+// logic as the chooser: the server already found the region; this just renders that exact crop.
+export async function renderRegionFromUrl(
+  url: string, page: number, bboxNorm: [number, number, number, number],
+): Promise<string | undefined> {
+  try {
+    const pdf = await pdfjs.getDocument({ url }).promise;
+    const pg = await pdf.getPage(page);
+    const vp = pg.getViewport({ scale: RENDER_SCALE });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(vp.width);
+    canvas.height = Math.ceil(vp.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return undefined;
+    await pg.render({ canvas, canvasContext: ctx, viewport: vp }).promise;
+    return cropToDataUrl(canvas, bboxNorm);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function renderFigureThumbs(file: File, figures: DetectedFigure[]): Promise<FigureThumb[]> {
   const out: FigureThumb[] = figures.map((f) => ({ ...f }));
   if (figures.length === 0) return out;

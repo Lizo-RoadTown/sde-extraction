@@ -57,7 +57,7 @@ export function PdfPane({
 
   if (!isRenderable(src)) {
     return (
-      <Card className="flex h-80 flex-col items-center justify-center gap-2 border-dashed text-center text-xs text-ink-faint">
+      <Card className="flex h-[36rem] flex-col items-center justify-center gap-2 border-dashed text-center text-xs text-ink-faint">
         <span className="rounded bg-surface-raised px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-dim">no PDF yet</span>
         <div>Source PDF appears here once the paper is uploaded.</div>
         {quote && <div className="mono mt-1 max-w-xs text-ink-dim">“{quote}”{targetPage ? ` · p.${targetPage}` : ""}</div>}
@@ -66,7 +66,7 @@ export function PdfPane({
   }
 
   return (
-    <Card className="flex h-80 flex-col gap-2 p-2">
+    <Card className="flex h-[36rem] flex-col gap-2 p-2">
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
@@ -92,7 +92,7 @@ export function PdfPane({
             onLoadError={(e) => setErr(`Could not load PDF: ${e.message}`)}
             loading={<div className="flex h-full items-center justify-center text-xs text-ink-faint">loading PDF…</div>}
           >
-            <Page pageNumber={page} width={420} renderTextLayer renderAnnotationLayer={false} />
+            <Page pageNumber={page} width={560} renderTextLayer renderAnnotationLayer={false} />
           </Document>
         )}
       </div>

@@ -117,6 +117,16 @@ function rowToExtraction(row: Record<string, unknown>): FigureExtraction {
     pdfUrl: (m.pdfUrl as string) ?? "#",
     storagePath: (row.papers as { storage_path?: string } | null)?.storage_path
       ?? (row.storage_path as string | undefined),
+    figureProvenance: (() => {
+      const fp = m._figure_provenance as Record<string, unknown> | undefined;
+      if (!fp || !Array.isArray(fp.bbox_norm)) return undefined;
+      return {
+        page: Number(fp.page),
+        bboxNorm: fp.bbox_norm as [number, number, number, number],
+        label: fp.label as string | undefined,
+        caption: fp.caption as string | undefined,
+      };
+    })(),
     variables,
     parameters,
     driftTerms: mapTerms(m.drift_terms ?? m.driftTerms),
