@@ -1,23 +1,15 @@
 ---
-title: Add a paper & verify it
-description: The end-to-end user motion — add a PDF, extract, and verify the result.
+title: Add a paper and check it
+description: The steps to add a paper, run the extraction, and check the result against the source.
 ---
 
-The dashboard's **Papers** surface is one motion: add a paper, then verify what the engine
-extracted.
+1. Add the paper. Upload the PDF. It is fingerprinted on upload and stored.
+2. Choose the figure. Pick the single figure you want the model for.
+3. Run it. The system reads the model behind that figure.
+4. Check it. When the result is ready, open it and check each value against its source in the paper.
+   Confirm it, or send it back.
 
-1. **Add.** Drop a PDF (or click to browse). It is fingerprinted (SHA-256) on upload and
-   stored.
-2. **Target.** Choose what the engine should extract — see
-   [targeting modes](/reference/targeting/).
-3. **Extract.** This enqueues a job. The [worker](/reference/pipeline/) picks it up.
-4. **Verify.** When the extraction is ready it appears in your papers list marked *needs
-   review*. Open it to inspect each slot — present or absent — against the source PDF, and
-   confirm or correct.
+A checked result is kept in the library. You need to be signed in to check results.
 
-A verified extraction enters the Library.
-
-:::note
-Verification requires being signed in. Until a real extraction has been run, items will not
-appear; see [Run the extraction worker](/how-to/run-worker/).
-:::
+To see what happens between steps 3 and 4, read
+[Follow a paper, step by step](/start/reproduce/).

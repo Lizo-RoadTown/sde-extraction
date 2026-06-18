@@ -3,10 +3,9 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import mermaid from "astro-mermaid";
 
-// SDE Extraction documentation — same framework + UI shape as the Knowledge
-// Observatory docs (Astro Starlight). Structure follows Diátaxis (Explanation /
-// Reference / How-to / Tutorials) + Decisions (ADRs). Sidebar order is explicit
-// so the intended scope is visible even where pages are "Not yet documented".
+// SDE Extraction documentation (Astro Starlight). Public site for a scientist reviewing a paper:
+// what the system reads out of a paper, and how to check and reproduce it. Plain language, no
+// programmer/AI jargon, no internal decisions/ADRs (those live in the repo docs/ tree).
 export default defineConfig({
   site: "https://sde-extraction-docs.vercel.app",
   integrations: [
@@ -33,41 +32,22 @@ export default defineConfig({
           items: [
             { label: "Overview", slug: "index" },
             { label: "Follow a paper, step by step", slug: "start/reproduce" },
-            { label: "Reading this documentation", slug: "start/how-to-read" },
+            { label: "How to read this", slug: "start/how-to-read" },
           ],
         },
         {
-          label: "Explanation — the why",
+          label: "How it works",
           items: [
-            { label: "The document-architecture canon", slug: "explanation/canon" },
-            { label: "Present / absent", slug: "explanation/present-absent" },
-            { label: "Provenance & lineage", slug: "explanation/provenance" },
-            { label: "The observability spine", slug: "explanation/observability" },
-            { label: "The three pillars", slug: "explanation/three-pillars" },
+            { label: "What it recognizes", slug: "explanation/recognizes" },
+            { label: "Where each value comes from", slug: "explanation/provenance" },
+            { label: "The structured map", slug: "reference/schema" },
+            { label: "Watch it work", slug: "explanation/observability" },
           ],
         },
         {
-          label: "Reference — the what",
+          label: "Use it",
           items: [
-            { label: "Extraction schema", slug: "reference/schema" },
-            { label: "Database schema", slug: "reference/database" },
-            { label: "The worker pipeline", slug: "reference/pipeline" },
-            { label: "Targeting modes", slug: "reference/targeting" },
-            { label: "Confidence & telemetry", slug: "reference/confidence" },
-          ],
-        },
-        {
-          label: "How-to — a goal",
-          items: [
-            { label: "Run the extraction worker", slug: "how-to/run-worker" },
-            { label: "Apply database migrations", slug: "how-to/migrations" },
-            { label: "Add a paper & verify it", slug: "how-to/add-and-verify" },
-          ],
-        },
-        {
-          label: "Tutorials — learn by doing",
-          items: [
-            { label: "Extract your first paper", slug: "tutorials/first-extraction" },
+            { label: "Add a paper and check it", slug: "how-to/add-and-verify" },
           ],
         },
       ],

@@ -1,77 +1,22 @@
 ---
-title: Extraction schema
-description: The Pydantic schema that constrains what the extractor returns — the present/absent slot, the model fields, and the lineage layer.
+title: The structured map
+description: A fixed list of every part a model of this kind needs, so nothing required is missed.
 ---
 
-The extraction schema is the single source of truth for what the extractor returns. It is a
-Pydantic model used directly as the response format for the language model, so the model is
-*forced* to return data matching it. The schema lives in `services/extraction/schema.py`.
+The system works from a fixed list of every part a model of this kind needs. This is what makes a
+result complete: every required part is either filled in from the paper or shown as a gap, so
+nothing required is quietly skipped.
 
-## The forced present/absent slot
+A model includes:
 
-Every captured fact is a `Slot`: a value the paper states, or an explicit absence.
-
-```python
-class Present(BaseModel):
-    status: Literal["present"]
-    value: str    # verbatim as written — never evaluated
-    meaning: str
-    quote: str    # exact source text — hashed for lineage
-    page: int
-
-class Absent(BaseModel):
-    status: Literal["absent"]
-    reason: AbsenceReason   # not_stated | requires_inference
-
-Slot = Union[Present, Absent]
-```
-
-The two absence reasons are the only two ([the canon](/explanation/canon/) collapsed an
-earlier set of four):
-
-| Reason | Meaning |
+| Part | What it is |
 |---|---|
-| `not_stated` | a genuine gap — the paper does not state it |
-| `requires_inference` | reachable only by inferring or deriving — the method refuses |
+| Variables | what the model tracks (for example susceptible, infected, recovered) and their starting values |
+| Parameters | the constants (for example transmission rate, recovery rate, noise strength) and their values |
+| Drift terms | the predictable part of each equation |
+| Diffusion terms | the random (noise) part of each equation |
+| Time span | the period the figure covers |
 
-:::caution[A structured-outputs constraint]
-`Slot` is a plain `Union`, **not** a Pydantic discriminated union. OpenAI Structured Outputs
-rejects the JSON-schema `oneOf` that a discriminator emits; a plain union emits `anyOf`,
-which is accepted. The `status` literal still distinguishes the two members.
-:::
-
-## The extracted model
-
-One `(paper, figure)` extraction, where **figure is one sub-figure** — a single graphic, not a
-multi-panel page (see [Targeting](/reference/targeting/)). That one graphic's panels form the
-**variable checklist**: the extractor must account for every panel, and a cross-check reports
-any captured-vs-panels gap before the result is stored (the completeness gate, S6 on the
-[seam map](/explanation/observability/)).
-
-Each field below is a `Slot` unless noted.
-
-| Field | Type | Holds |
-|---|---|---|
-| `paper_title` | `Slot` | the paper's title |
-| `pathogen` | `Slot` | the disease/pathogen modelled |
-| `figure_label` | `str` | which figure this extraction targets |
-| `state_variables` | `list` of `{symbol, initial_value: Slot}` | the compartments |
-| `parameters` | `list` of `{symbol, value: Slot}` | named constants |
-| `drift_terms` | `list` of `{variable, expression: Slot}` | the deterministic part |
-| `diffusion_terms` | `list` of `{variable, expression: Slot}` | the stochastic part |
-| `figure_binding` | `Slot` | "which values produced this figure?" |
-
-## The lineage layer (filled by code, never the model)
-
-After extraction, the pipeline computes a SHA-256 over each *present* slot's source quote
-(`checksums_for`), producing one hash per captured piece. The model quotes; the code hashes.
-See [Provenance & lineage](/explanation/provenance/).
-
-## Status of the schema
-
-The present/absent slot, the two-reason absence taxonomy, and verbatim transcription are
-**approved and stable**. Which slots exist, the lineage design, and the figure binding are
-**under review**. The **transformation-step node** (per the canon) is **not yet modeled** —
-the main open piece.
-
-*Source: `services/extraction/schema.py`.*
+For each part, the system records the value from the paper with its source, or marks it
+"not stated". See [Where each value comes from](/explanation/provenance/) and
+[What it recognizes](/explanation/recognizes/).

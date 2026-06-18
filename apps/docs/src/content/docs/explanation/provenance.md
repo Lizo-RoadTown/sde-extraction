@@ -1,31 +1,21 @@
 ---
-title: Provenance & lineage
-description: How every captured value is tied back to the exact bytes and text it came from, by hash.
+title: Where each value comes from
+description: Every value the system records is tied to the exact place in the paper it came from, so you can check it.
 ---
 
-Provenance is not a feature bolted onto this system — it is the backbone. The method's claim
-is that an extracted model is *provable*, and a claim of provability requires that every
-value trace, by cryptographic hash, to the source it was read from.
+Every value the system records is tied back to the exact place in the paper it came from. For each
+value you can see:
 
-## Two levels of fingerprint
+- the exact quote (the sentence in the paper that states it),
+- the page number,
+- the spot on the page, highlighted.
 
-| Level | What is hashed | When |
-|---|---|---|
-| **Document** | the exact PDF bytes (`file_sha256`) | at upload, before extraction |
-| **Piece** | each present slot's source quote (one SHA-256 per slot) | after extraction, by code |
+To check a value, open that page, find the highlighted sentence, and confirm it matches.
 
-The document fingerprint anchors the whole paper to an immutable identity. The per-piece
-hashes anchor each *captured value* to the exact text it was transcribed from. The language
-model produces the quote; the pipeline computes the hash. The model never hashes — that
-separation is what keeps the lineage tamper-evident and reproducible.
+The original PDF is kept by a fingerprint of its exact contents, so the paper a value was read from
+cannot be swapped or changed without it showing.
 
-## Why per-piece, not just per-document
+Nothing is recorded without a source. If the paper does not state a value, the system marks it
+"not stated" rather than recording a number.
 
-A single document hash proves *which paper*. It does not prove *which words* a value came
-from. The per-piece hashes close that gap: each value in the final model is bound to its
-own slice of the source. This is also the data behind the planned
-[fingerprint-formation view](/explanation/observability/) — the fingerprint shown not as a
-phantom number, but assembled, piece by piece, from the user's own data.
-
-*Source: `services/extraction/schema.py` (`checksums_for`, `Provenance`),
-`apps/dashboard/src/data.ts` (`fingerprintFile`).*
+See this in context in [Follow a paper, step by step](/start/reproduce/).
