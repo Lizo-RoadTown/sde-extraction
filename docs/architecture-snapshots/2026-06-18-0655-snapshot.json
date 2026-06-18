@@ -1,0 +1,241 @@
+{
+  "timestamp": "2026-06-18T06:55:21.460563+00:00",
+  "git_sha": "6b6bbd4b46f450e370299ef245f5829bbfaa7049",
+  "repo_root": "C:\\Users\\Liz\\SDE_Extraction",
+  "render": {
+    "present": true,
+    "services": [
+      {
+        "name": "sde-extraction-worker",
+        "type": "worker",
+        "runtime": "docker",
+        "plan": null,
+        "region": null,
+        "auto_deploy": true,
+        "previews": null,
+        "health_check": null,
+        "env_var_keys": [
+          "DATABASE_URL",
+          "OPENAI_API_KEY",
+          "OPENAI_MODEL",
+          "POLL_INTERVAL",
+          "PYTHONUNBUFFERED",
+          "SUPABASE_SERVICE_ROLE_KEY",
+          "SUPABASE_URL"
+        ],
+        "disk": null
+      }
+    ],
+    "databases": []
+  },
+  "node": {
+    "present": true,
+    "manifests": [
+      {
+        "path": "apps/dashboard/package.json",
+        "name": "dashboard",
+        "version": "0.0.0",
+        "scripts": [
+          "dev",
+          "build",
+          "lint",
+          "preview"
+        ],
+        "key_dependencies": {
+          "@supabase/supabase-js": "^2.107.0",
+          "react": "^19.2.6",
+          "react-dom": "^19.2.6",
+          "tailwindcss": "^4.3.0",
+          "typescript": "~6.0.2",
+          "vite": "^8.0.12"
+        },
+        "total_dependency_count": 9,
+        "total_dev_dependency_count": 13
+      },
+      {
+        "path": "apps/docs/package.json",
+        "name": "sde-extraction-docs",
+        "version": "0.0.1",
+        "scripts": [
+          "dev",
+          "build",
+          "preview"
+        ],
+        "key_dependencies": {},
+        "total_dependency_count": 5,
+        "total_dev_dependency_count": 0
+      }
+    ],
+    "total_manifest_count": 2
+  },
+  "python": {
+    "present": true,
+    "manifests": [
+      {
+        "path": "scripts/requirements-spike.txt",
+        "kind": "requirements.txt",
+        "package_count": 3,
+        "packages": [
+          {
+            "name": "pillow",
+            "constraint": ""
+          },
+          {
+            "name": "pymupdf",
+            "constraint": ""
+          },
+          {
+            "name": "requests",
+            "constraint": ""
+          }
+        ]
+      },
+      {
+        "path": "services/extraction/requirements.txt",
+        "kind": "requirements.txt",
+        "package_count": 7,
+        "packages": [
+          {
+            "name": "openai",
+            "constraint": ">=1.40.0"
+          },
+          {
+            "name": "pdfplumber",
+            "constraint": ">=0.11.0"
+          },
+          {
+            "name": "psycopg[binary]",
+            "constraint": ">=3.1.0"
+          },
+          {
+            "name": "pydantic",
+            "constraint": ">=2.0.0"
+          },
+          {
+            "name": "pymupdf",
+            "constraint": ">=1.24.0"
+          },
+          {
+            "name": "python-dotenv",
+            "constraint": ">=1.0.0"
+          },
+          {
+            "name": "supabase",
+            "constraint": ">=2.0.0"
+          }
+        ]
+      }
+    ],
+    "total_manifest_count": 2,
+    "total_package_count": 10
+  },
+  "mcp": {
+    "present": true,
+    "servers": [
+      {
+        "name": "loom-memory",
+        "shape": "url",
+        "command": null,
+        "args_count": 0,
+        "url": "https://loom-agent-context.onrender.com/mcp/memory/"
+      },
+      {
+        "name": "supabase",
+        "shape": "url",
+        "command": null,
+        "args_count": 0,
+        "url": "https://mcp.supabase.com/mcp?project_ref=sohimlkvueagelulsrgi&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching%2Cstorage"
+      }
+    ]
+  },
+  "auth": {
+    "present": false
+  },
+  "inventory": {
+    "present": true,
+    "directories": [
+      {
+        "name": "Agent Drafts",
+        "file_count_depth_1": 1,
+        "subdir_count": 2
+      },
+      {
+        "name": "apps",
+        "file_count_depth_1": 1,
+        "subdir_count": 2
+      },
+      {
+        "name": "AT3_review",
+        "file_count_depth_1": 4,
+        "subdir_count": 9
+      },
+      {
+        "name": "docs",
+        "file_count_depth_1": 1,
+        "subdir_count": 7
+      },
+      {
+        "name": "Human validated",
+        "file_count_depth_1": 1,
+        "subdir_count": 0
+      },
+      {
+        "name": "research",
+        "file_count_depth_1": 1,
+        "subdir_count": 4
+      },
+      {
+        "name": "scripts",
+        "file_count_depth_1": 7,
+        "subdir_count": 1
+      },
+      {
+        "name": "services",
+        "file_count_depth_1": 1,
+        "subdir_count": 1
+      },
+      {
+        "name": "skills",
+        "file_count_depth_1": 0,
+        "subdir_count": 0
+      },
+      {
+        "name": "skills_private",
+        "file_count_depth_1": 0,
+        "subdir_count": 0
+      },
+      {
+        "name": "supabase",
+        "file_count_depth_1": 0,
+        "subdir_count": 1
+      }
+    ],
+    "notable_files": [
+      {
+        "name": ".env.template",
+        "type": "file"
+      },
+      {
+        "name": ".mcp.json",
+        "type": "file"
+      },
+      {
+        "name": ".project-intelligence",
+        "type": "dir"
+      },
+      {
+        "name": "CLAUDE.md",
+        "type": "file"
+      },
+      {
+        "name": "README.md",
+        "type": "file"
+      },
+      {
+        "name": "render.yaml",
+        "type": "file"
+      }
+    ]
+  },
+  "shape": "mixed"
+}
