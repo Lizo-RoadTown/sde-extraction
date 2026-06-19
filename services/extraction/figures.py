@@ -32,7 +32,10 @@ CAPTION = re.compile(r"\b(?:fig(?:ure)?\.?)\s*([0-9]{1,3}[a-z]?)\b", re.IGNORECA
 CAPTION_START = re.compile(r"^\s*(?:fig(?:ure)?\.?)\s*([0-9]{1,3}[a-z]?)\b", re.IGNORECASE)
 
 MAX_SCALE = 4.0   # crop-don't-crank guard: clamp rasterization scale so we never blast DPI
-MERGE_GAP = 24.0  # points; sub-panels/images closer than this merge into ONE figure region
+MERGE_GAP = 24.0  # points; embedded-image rects closer than this merge into ONE image region
+PANEL_GAP = 14.0  # points; vector strokes within this distance are the SAME panel — larger gaps
+                  # between subplots separate them, so a multi-panel figure splits into one
+                  # region PER PANEL. The anchor must be ONE graphic (one set of axes/ranges).
 
 
 class FigureRegion(BaseModel):
@@ -172,10 +175,84 @@ def _caption_region(page, crect, captions, drawing_rects):
     return u
 
 
+def _widest_gap(proj, frac: float, min_gutter: int):
+    """The widest interior white gutter in an ink projection (a band with <= frac of the max ink,
+    >= min_gutter long, content on BOTH sides) — where a compound figure splits. None if none."""
+    thresh = max(1.0, float(proj.max()) * frac)
+    empty = proj <= thresh
+    best = None
+    i, n = 0, len(proj)
+    while i < n:
+        if empty[i]:
+            j = i
+            while j < n and empty[j]:
+                j += 1
+            if (j - i) >= min_gutter and i > 0 and j < n and (best is None or (j - i) > best[2]):
+                best = (i, j, j - i)
+            i = j
+        else:
+            i += 1
+    return best
+
+
+def _xy_cut(gray, ox, oy, frac, min_gutter, min_split, out, depth=0):
+    """Recursive X-Y cut: split along the SINGLE widest white gutter (only when both sides stay
+    >= min_split), recurse, and emit each leaf trimmed to its ink. One leaf = one panel (one set of
+    axes/ranges). Single-widest-gap (not all-gaps) avoids shredding a panel at minor internal gaps."""
+    import numpy as np
+    ink = gray < 245
+    if not ink.any():
+        return
+    rg = _widest_gap(ink.sum(axis=1), frac, min_gutter)
+    cg = _widest_gap(ink.sum(axis=0), frac, min_gutter)
+    cand = []
+    if rg and rg[0] >= min_split and (gray.shape[0] - rg[1]) >= min_split:
+        cand.append(("r", rg))
+    if cg and cg[0] >= min_split and (gray.shape[1] - cg[1]) >= min_split:
+        cand.append(("c", cg))
+    if depth < 14 and cand:
+        axis, gap = max(cand, key=lambda x: x[1][2])
+        m = (gap[0] + gap[1]) // 2
+        if axis == "r":
+            _xy_cut(gray[:m, :], ox, oy, frac, min_gutter, min_split, out, depth + 1)
+            _xy_cut(gray[m:, :], ox, oy + m, frac, min_gutter, min_split, out, depth + 1)
+        else:
+            _xy_cut(gray[:, :m], ox, oy, frac, min_gutter, min_split, out, depth + 1)
+            _xy_cut(gray[:, m:], ox + m, oy, frac, min_gutter, min_split, out, depth + 1)
+        return
+    ys, xs = np.where(ink)  # leaf: trim to the actual ink so the crop hugs the panel
+    out.append((ox + int(xs.min()), oy + int(ys.min()), ox + int(xs.max()), oy + int(ys.max())))
+
+
+def _split_into_panels(page, fig_rect, scale: float = 2.0) -> list:
+    """Render the figure region and X-Y-cut it into individual panels. Drops label/legend slivers
+    (too small to be a plot). Returns reading-ordered fitz.Rect panels in PDF coords, or [the whole
+    region] when it doesn't cleanly split. Projection cut is the lightest splitter — imperfect on
+    dense grids; the human sees each crop and picks (PanelSeg is the accuracy upgrade path)."""
+    import fitz
+    import numpy as np
+    try:
+        pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=fig_rect, colorspace=fitz.csGRAY)
+        gray = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.stride)[:, :pix.width]
+    except Exception:  # noqa: BLE001 — a bad render shouldn't drop the figure
+        return [fitz.Rect(fig_rect)]
+    boxes: list = []
+    _xy_cut(gray, 0, 0, 0.06, int(2 * scale), int(15 * scale), boxes)
+    panels = []
+    for px0, py0, px1, py1 in boxes:
+        if (px1 - px0) / scale >= 50 and (py1 - py0) / scale >= 40:  # a panel is a plot, not a label
+            panels.append(fitz.Rect(
+                fig_rect.x0 + px0 / scale, fig_rect.y0 + py0 / scale,
+                fig_rect.x0 + px1 / scale, fig_rect.y0 + py1 / scale,
+            ))
+    panels.sort(key=lambda r: (round(r.y0 / 10), r.x0))  # reading order
+    return panels or [fitz.Rect(fig_rect)]
+
+
 def detect_figures(pdf_path: str) -> list[FigureRegion]:
-    """All figure regions in the PDF. RASTER figures come from embedded-image clusters; VECTOR figures
-    (line plots) are anchored by their caption and bounded by the real drawings above it. Labelled by
-    caption. No ranking, no auto-pick — every figure is surfaced for the human to choose."""
+    """Every PANEL in the PDF, surfaced for the human to choose ONE. Figure-level regions come from
+    embedded images (raster) or caption-anchored vector drawings; each is then X-Y-cut into its
+    individual panels (one set of axes/ranges per panel). No ranking, no auto-pick."""
     import fitz
     regions: list[FigureRegion] = []
     doc = fitz.open(pdf_path)
@@ -186,20 +263,14 @@ def detect_figures(pdf_path: str) -> list[FigureRegion]:
             if pw <= 0 or ph <= 0:
                 continue
             captions = _captions(page)
-            clusters = _merge_rects(_image_rects(page))
+            # figure-level regions: (rect, label, caption, source)
+            figs: list = []
             claimed: set[int] = set()
-            # raster figures (embedded images)
-            for c in clusters:
+            for c in _merge_rects(_image_rects(page)):
                 label, cap, ci = _nearest_caption(c, captions)
                 if ci is not None:
                     claimed.add(ci)
-                regions.append(FigureRegion(
-                    page=pno + 1,
-                    bbox=(c.x0, c.y0, c.x1, c.y1),
-                    bbox_norm=(c.x0 / pw, c.y0 / ph, c.x1 / pw, c.y1 / ph),
-                    label=label, caption=cap, area=c.get_area(), source="image",
-                ))
-            # vector figures: each remaining caption, bounded by the real drawings above it
+                figs.append((fitz.Rect(c), label, cap, "image"))
             drawing_rects: Optional[list] = None
             for ci, (label, crect, ctext) in enumerate(captions):
                 if ci in claimed:
@@ -207,14 +278,21 @@ def detect_figures(pdf_path: str) -> list[FigureRegion]:
                 if drawing_rects is None:
                     drawing_rects = [fitz.Rect(d["rect"]) for d in page.get_drawings()]
                 u = _caption_region(page, crect, captions, drawing_rects)
-                if u is None:
-                    continue
-                regions.append(FigureRegion(
-                    page=pno + 1,
-                    bbox=(u.x0, u.y0, u.x1, u.y1),
-                    bbox_norm=(u.x0 / pw, u.y0 / ph, u.x1 / pw, u.y1 / ph),
-                    label=label, caption=ctext, area=u.get_area(), source="vector",
-                ))
+                if u is not None:
+                    figs.append((u, label, ctext, "vector"))
+            # split each figure into its panels — the human picks ONE panel (one set of ranges)
+            for fig_rect, label, cap, source in figs:
+                panels = _split_into_panels(page, fig_rect)
+                multi = len(panels) > 1
+                for i, p in enumerate(panels):
+                    plabel = f"{label} · {i + 1}" if (multi and label) else label
+                    regions.append(FigureRegion(
+                        page=pno + 1,
+                        bbox=(p.x0, p.y0, p.x1, p.y1),
+                        bbox_norm=(p.x0 / pw, p.y0 / ph, p.x1 / pw, p.y1 / ph),
+                        label=plabel, caption=cap, area=p.get_area(),
+                        source=(source + "+panel") if multi else source,
+                    ))
     finally:
         doc.close()
     return regions
