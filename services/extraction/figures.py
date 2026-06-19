@@ -224,13 +224,38 @@ def _xy_cut(gray, ox, oy, frac, min_gutter, min_split, out, depth=0):
     out.append((ox + int(xs.min()), oy + int(ys.min()), ox + int(xs.max()), oy + int(ys.max())))
 
 
+def _panel_rects(page, fig_rect) -> list:
+    """Axes-box panels: scientific plots draw a rectangle frame per subplot. Detecting those vector
+    rectangles segments panels far more reliably than pixel cuts (when they exist). Returns reading-
+    ordered fitz.Rect (padded for tick labels) inside the figure; [] when the plots have no frames."""
+    import fitz
+    figarea = fig_rect.get_area() or 1.0
+    out: list = []
+    for d in page.get_drawings():
+        if not any(it[0] == "re" for it in d.get("items", [])):
+            continue
+        r = fitz.Rect(d["rect"])
+        if r.width < 40 or r.height < 25 or r.get_area() > 0.9 * figarea:
+            continue  # too small to be a plot, or the figure's own outer border
+        cx, cy = (r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2
+        if not (fig_rect.x0 <= cx <= fig_rect.x1 and fig_rect.y0 <= cy <= fig_rect.y1):
+            continue  # outside this figure
+        if any(abs(r.x0 - u.x0) < 6 and abs(r.y0 - u.y0) < 6 and abs(r.width - u.width) < 6 for u in out):
+            continue  # duplicate frame (double-stroked)
+        out.append(fitz.Rect(r.x0 - 6, r.y0 - 6, r.x1 + 6, r.y1 + 16) & fig_rect)  # pad for axis labels
+    out.sort(key=lambda r: (round(r.y0 / 10), r.x0))
+    return out
+
+
 def _split_into_panels(page, fig_rect, scale: float = 2.0) -> list:
-    """Render the figure region and X-Y-cut it into individual panels. Drops label/legend slivers
-    (too small to be a plot). Returns reading-ordered fitz.Rect panels in PDF coords, or [the whole
-    region] when it doesn't cleanly split. Projection cut is the lightest splitter — imperfect on
-    dense grids; the human sees each crop and picks (PanelSeg is the accuracy upgrade path)."""
+    """Split a figure into its panels. FIRST try axes-box rectangles (clean for framed plots); if a
+    figure has fewer than 2, fall back to the projection/X-Y cut on the rendered crop. Returns
+    reading-ordered fitz.Rect panels in PDF coords, or [the whole region] when it doesn't split."""
     import fitz
     import numpy as np
+    rects = _panel_rects(page, fig_rect)
+    if len(rects) >= 2:
+        return rects  # framed subplots — the reliable case
     try:
         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=fig_rect, colorspace=fitz.csGRAY)
         gray = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.stride)[:, :pix.width]
