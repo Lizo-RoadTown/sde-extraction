@@ -1,7 +1,7 @@
 {
   "name": "sde-extraction-guard",
-  "description": "Repo-specific schema guard for SDE_Extraction, hook-enforced: after edits to the extraction surface it runs scripts/check_schema.py and blocks a broken schema (the class of bug that crash-looped the worker). Bundles the recorded-transformation discipline skill. Complements loom-discipline (which handles drift reminders + auto-updating architecture snapshots); this adds the SDE-specific schema validation those generic plugins can't.",
-  "version": "0.1.0",
+  "description": "Repo-specific guard for SDE_Extraction, hook-enforced. (1) Framing-clarification gate: a UserPromptSubmit hook injects a gate that forces the assistant to restate the request in the operator's words, classify the artifact (new system | layer | edit), name where it lives, and confirm BEFORE building — catching the recurring drift where a requested layer/tool gets upgraded into a separate deployed system. (2) Schema guard: after edits to the extraction surface it runs scripts/check_schema.py and blocks a broken schema. Bundles the recorded-transformation discipline skill. Complements loom-discipline.",
+  "version": "0.2.0",
   "author": {
     "name": "Liz Osborn",
     "url": "https://github.com/Lizo-RoadTown"
