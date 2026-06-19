@@ -34,8 +34,9 @@ services:
 
   # The Dagster orchestrator webserver (skeleton deploy). Build context is the REPO ROOT because the
   # image needs BOTH services/orchestration and services/extraction (the ../extraction import shim).
-  # Storage reuses the existing Supabase Postgres via DAGSTER_PG_URL (dashboard-managed secret) — set
-  # it to the Supabase SESSION-pooler connection string (IPv4, port 5432). Render injects $PORT.
+  # Storage reuses the existing Supabase Postgres, but isolated to the `dagster` schema (see
+  # services/orchestration/dagster.yaml). Set the five DAGSTER_PG_* secrets to the Supabase SESSION
+  # pooler (port 5432, IPv4) values; PREREQ: `CREATE SCHEMA IF NOT EXISTS dagster;` once. Render injects $PORT.
   - name: sde-orchestration-web
     type: web
     runtime: docker
@@ -43,5 +44,13 @@ services:
     dockerContext: .
     autoDeploy: true
     envVars:
-      - key: DAGSTER_PG_URL
+      - key: DAGSTER_PG_HOST
+        sync: false
+      - key: DAGSTER_PG_PORT
+        sync: false
+      - key: DAGSTER_PG_USER
+        sync: false
+      - key: DAGSTER_PG_PASSWORD
+        sync: false
+      - key: DAGSTER_PG_DB
         sync: false

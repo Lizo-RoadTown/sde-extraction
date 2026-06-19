@@ -34,11 +34,23 @@ uv run dg launch --assets reproduction_record   # materialize end to end
 uv run dg dev                                   # lineage UI at localhost:3000
 ```
 
-## Deploy note
+## Deploy (Render)
 
-Today the repo's only services are the Render extraction worker (`render.yaml`) + the Vercel dashboard
-+ Supabase. None is an orchestration engine. Dagster's open-source core (Apache 2.0) is self-hosted as
-a **new** service alongside the worker (no Dagster+ required). Wiring that deploy is a later step.
+Dagster's open-source core (Apache 2.0) is self-hosted as a **new** Render web service alongside the
+worker (no Dagster+ required). Deploy-as-code lives in `Dockerfile`, `workspace.yaml`, `dagster.yaml`,
+and the `sde-orchestration-web` service in the repo-root `render.yaml`. Validated locally: image builds,
+container boots, loads `orchestration.definitions`, serves `/server_info` 200.
+
+**Storage reuses the existing Supabase Postgres — isolated to its own `dagster` schema** (validated safe;
+shared `public` was not). Before first deploy, run once in Supabase:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS dagster;
+```
+
+Then set the five `DAGSTER_PG_*` secrets (from the Supabase **Session pooler**, port 5432) on the Render
+service. `search_path=dagster` is pinned in `dagster.yaml`, so Dagster's ~22 tables never touch `public`
+and Supabase won't auto-expose them. Smoke-test the first boot: confirm the tables landed in `dagster.*`.
 
 ## Fill-out order
 
