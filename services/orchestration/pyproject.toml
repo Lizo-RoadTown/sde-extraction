@@ -5,6 +5,8 @@ version = "0.1.0"
 dependencies = [
     "dagster==1.13.10",
     "pydantic>=2",
+    "pymupdf>=1.24",
+    "numpy>=1.26",
 ]
 
 [dependency-groups]

@@ -11,7 +11,7 @@ science.
 
 | Node | Stage | Status |
 |---|---|---|
-| `detect_figures` | figure-detect | **placeholder** — real impl = `figures.detect_serializable` + the human picks one panel |
+| `detect_figures` | figure-detect | **real** — runs `figures.detect_serializable` + isolates the human's picked panel (`isolate_region`/`isolate_figure`), records dual SHA-256 provenance. Takes a `ChosenFigure` run config (`pdf_path` + the pick) |
 | `read_model` | figure-read | **placeholder** — real impl = a vision-LLM subagent (autonomous) |
 | `fan_out_variables` | per-variable fan-out | **real** — Dagster dynamic mapping (`DynamicOut` / `.map` / `.collect`) |
 | `extract_variable` (mapped) | per-variable lift | lift content **placeholder** (subagent not wired); the **Pydantic classifier layer is real** — `VariableClassification` validated, role gated against the registry via `match_role` |
@@ -40,11 +40,11 @@ Today the repo's only services are the Render extraction worker (`render.yaml`) 
 + Supabase. None is an orchestration engine. Dagster's open-source core (Apache 2.0) is self-hosted as
 a **new** service alongside the worker (no Dagster+ required). Wiring that deploy is a later step.
 
-## Fill-out order (next)
+## Fill-out order
 
-1. `detect_figures` -> call the real `figures.detect_serializable` + carry the human's panel pick.
-2. `read_model` + `extract_variable` -> the real subagents (OpenAI + Pydantic brain), still gated by the
+1. ~~`detect_figures` -> real `figures.detect_serializable` + the human's panel pick.~~ **done.**
+2. `reproduce` -> build the `ExecutableModel` and run the BioModels diffrax harness (Euler-Maruyama,
+   fixed seed) twice; set `ran_ok` + the result hashes so `decide()` yields a real verdict. **next.**
+3. `read_model` + `extract_variable` -> the real subagents (OpenAI + Pydantic brain), still gated by the
    classifier layer.
-3. `reproduce` -> build the `ExecutableModel` and run the BioModels diffrax harness (Euler-Maruyama,
-   fixed seed) twice; set `ran_ok` + the result hashes so `decide()` yields a real verdict.
 4. Persist the `ReproductionRecord` to Supabase; surface per-subagent health by variable/parameter type.

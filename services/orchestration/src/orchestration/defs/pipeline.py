@@ -30,7 +30,20 @@ if str(_EXTRACTION) not in sys.path:
 
 import classification as c  # noqa: E402  (controlled registries + the Pydantic classifier layer)
 import transform as tr      # noqa: E402  (recorded-transformation machinery + two-part verdict)
+import figures as figmod    # noqa: E402  (real figure detection + isolation — PyMuPDF)
 from schema import Present   # noqa: E402  (a present/absent Slot for the verbatim term)
+
+
+class ChosenFigure(dg.Config):
+    """The run input: which PDF, and the ONE figure/panel the human picked. The pick is anchored by
+    bbox (page + bbox_norm) when given — panels share a label, so the human's box IS the truth
+    (figures.isolate_region). Falls back to label, else the largest-area figure."""
+
+    pdf_path: str
+    page: int | None = None
+    bbox_norm: list[float] | None = None  # [x0, y0, x1, y1], page-normalized — the human's pick
+    label: str | None = None
+    scale: float = 2.0
 
 
 def _seam(context, name, **fields):
@@ -44,14 +57,33 @@ def _mapping_key(symbol):
     return "".join(ch if ch.isalnum() else "_" for ch in symbol) or "var"
 
 
-# --- DETERMINISTIC: figure detection -------------------------------------------------
-# Real impl: figures.detect_serializable(pdf) finds the figures, the human picks ONE panel.
-# Skeleton: a fixed chosen-figure descriptor so the graph runs end to end.
+# --- DETERMINISTIC: figure detection + isolation (REAL) ------------------------------
+# Runs the real detector (figures.detect_serializable) for observability of what was found, then
+# isolates the ONE figure/panel the human picked (anchored by bbox when given). Records dual SHA-256
+# provenance (source PDF + isolated image) — the lift's first recorded seam, grounded in reality.
 @dg.op
-def detect_figures(context) -> dict:
-    chosen = {"label": "2", "page": 2}  # PLACEHOLDER for figures.detect + human pick
-    _seam(context, "figure-detect", chosen=chosen,
-          note="placeholder; real impl = figures.detect_serializable + human pick")
+def detect_figures(context, config: ChosenFigure) -> dict:
+    detected = figmod.detect_serializable(config.pdf_path)
+    if config.page is not None and config.bbox_norm:
+        iso = figmod.isolate_region(config.pdf_path, page=config.page, bbox_norm=config.bbox_norm,
+                                    label=config.label, scale=config.scale)
+    else:
+        iso = figmod.isolate_figure(config.pdf_path, label=config.label, scale=config.scale)
+    if iso is None:
+        raise dg.Failure(f"no figure detected in {config.pdf_path}")
+    region, prov = iso["region"], iso["provenance"]
+    chosen = {
+        "label": region.label, "page": region.page, "bbox_norm": list(region.bbox_norm),
+        "source_sha256": prov.source_sha256, "image_sha256": prov.image_sha256,
+        "n_detected": len(detected),
+    }
+    _seam(context, "figure-detect", n_detected=len(detected), page=region.page,
+          label=region.label, image_sha256=prov.image_sha256[:12])
+    context.add_output_metadata({
+        "n_detected": len(detected), "chosen_page": region.page,
+        "chosen_label": str(region.label), "image_sha256": prov.image_sha256,
+        "source_sha256": prov.source_sha256,
+    })
     return chosen
 
 
