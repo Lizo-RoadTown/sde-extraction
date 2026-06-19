@@ -135,6 +135,8 @@ def main() -> int:
         assert tr.ReproductionRecord(result_sha256="a", rerun_sha256="a").decide().figure_reproduced is True
         assert tr.ReproductionRecord(result_sha256="a", rerun_sha256="b").decide().figure_reproduced is False
         assert tr.ReproductionRecord().decide().status == "not_run"  # no run -> no verdict (never guessed)
+        errored = tr.ReproductionRecord(ran_ok=False).decide()  # ran but crashed != never ran
+        assert errored.status == "failed" and errored.figure_reproduced is False
         print("  ok    transform: term lift validates; reproduction verdict only from same-results check")
     except Exception as e:  # noqa: BLE001
         fails.append(f"transform: {type(e).__name__}: {e}")

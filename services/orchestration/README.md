@@ -1,0 +1,50 @@
+# orchestration — the deterministic extraction backbone (Dagster)
+
+A dynamic-task-mapping DAG that runs every **deterministic** moment of extraction as an observable,
+retriable node, and confines **autonomous** behavior to a few subagent nodes. The point is *true
+reproducibility*: the whole run is a recorded, replayable, audited graph.
+
+This is a **skeleton** — it proves the shape end to end. It is not deployed and does not yet do real
+science.
+
+## What is real vs a placeholder (skeleton)
+
+| Node | Stage | Status |
+|---|---|---|
+| `detect_figures` | figure-detect | **placeholder** — real impl = `figures.detect_serializable` + the human picks one panel |
+| `read_model` | figure-read | **placeholder** — real impl = a vision-LLM subagent (autonomous) |
+| `fan_out_variables` | per-variable fan-out | **real** — Dagster dynamic mapping (`DynamicOut` / `.map` / `.collect`) |
+| `extract_variable` (mapped) | per-variable lift | lift content **placeholder** (subagent not wired); the **Pydantic classifier layer is real** — `VariableClassification` validated, role gated against the registry via `match_role` |
+| `reconcile` | reconcile | **real** — collects per-variable `TermTransform`s into a `ReproductionRecord` |
+| `reproduce` | verify (re-sim) | verdict logic **real** (two-part); the diffrax oracle is **not wired**, so the verdict is honestly `not_run` — never a guessed verdict |
+
+The reproducibility core imports the real machinery from `../extraction` (`schema`, `classification`,
+`transform`) — pydantic-only modules, added to `sys.path` in `defs/pipeline.py`.
+
+Every node emits one `[seam:<name>]` log line — the observability seam (a validation_event). Per-node
+lineage + retriability is exactly why Dagster was chosen.
+
+## Run it
+
+```bash
+cd services/orchestration
+uv sync
+uv run dg check defs                            # validate
+uv run dg launch --assets reproduction_record   # materialize end to end
+uv run dg dev                                   # lineage UI at localhost:3000
+```
+
+## Deploy note
+
+Today the repo's only services are the Render extraction worker (`render.yaml`) + the Vercel dashboard
++ Supabase. None is an orchestration engine. Dagster's open-source core (Apache 2.0) is self-hosted as
+a **new** service alongside the worker (no Dagster+ required). Wiring that deploy is a later step.
+
+## Fill-out order (next)
+
+1. `detect_figures` -> call the real `figures.detect_serializable` + carry the human's panel pick.
+2. `read_model` + `extract_variable` -> the real subagents (OpenAI + Pydantic brain), still gated by the
+   classifier layer.
+3. `reproduce` -> build the `ExecutableModel` and run the BioModels diffrax harness (Euler-Maruyama,
+   fixed seed) twice; set `ran_ok` + the result hashes so `decide()` yields a real verdict.
+4. Persist the `ReproductionRecord` to Supabase; surface per-subagent health by variable/parameter type.
