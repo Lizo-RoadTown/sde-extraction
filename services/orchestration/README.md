@@ -1,62 +1,41 @@
-# orchestration — the deterministic extraction backbone (Dagster)
+# orchestration — a test workflow stack (Dagster) over the existing pipeline
 
-A dynamic-task-mapping DAG that runs every **deterministic** moment of extraction as an observable,
-retriable node, and confines **autonomous** behavior to a few subagent nodes. The point is *true
-reproducibility*: the whole run is a recorded, replayable, audited graph.
+A thin Dagster **layer** that runs the SAME real functions the worker uses
+(`../extraction`: `figures`, `processor`, `oracle`), so the existing pipeline's stages become explicit,
+ordered, observable steps you can run **locally on this test branch**. It is a test of whether making
+the deterministic moments concrete (and confining the LLM to one node) is worth it.
 
-This is a **skeleton** — it proves the shape end to end. It is not deployed and does not yet do real
-science.
+**It is NOT a separate app or engine, it is NOT deployed, and it has no separate database.** It shares
+the existing pipeline's code and runs locally. (An earlier version of this was wrongly built as a
+standalone deployed site; that was removed.)
 
-## What is real vs a placeholder (skeleton)
+## Stages (mirroring the real pipeline)
 
-| Node | Stage | Status |
+| Node | Kind | What it does |
 |---|---|---|
-| `detect_figures` | figure-detect | **real** — runs `figures.detect_serializable` + isolates the human's picked panel (`isolate_region`/`isolate_figure`), records dual SHA-256 provenance. Takes a `ChosenFigure` run config (`pdf_path` + the pick) |
-| `read_model` | figure-read | **placeholder** — real impl = a vision-LLM subagent (autonomous) |
-| `fan_out_variables` | per-variable fan-out | **real** — Dagster dynamic mapping (`DynamicOut` / `.map` / `.collect`) |
-| `extract_variable` (mapped) | per-variable lift | lift content **placeholder** (subagent not wired); the **Pydantic classifier layer is real** — `VariableClassification` validated, role gated against the registry via `match_role` |
-| `reconcile` | reconcile | **real** — collects per-variable `TermTransform`s into a `ReproductionRecord` |
-| `reproduce` | verify (re-sim) | **real** — calls `oracle.run_reproduction` (the BioModels diffrax harness, fixed seed, run twice → hash-compare) when a runnable `ExecutableModel` exists; with the placeholder lift no model is assembled, so the verdict is honestly `not_run`. Oracle itself tested in `tests/test_oracle.py` |
+| `detect_figures` | deterministic | real `figures.detect_serializable` + isolate the human's picked panel; dual SHA-256 provenance |
+| `extract` | the ONE LLM node | real `processor.run` — dry-run by default (`no_llm`, no OpenAI spend); set `no_llm=false` + a key for a real call |
+| `reproduce` | deterministic | real `oracle.run_reproduction` when an executable model exists; otherwise honest `not_run` (the extractor doesn't assemble an executable model yet) |
 
-The reproducibility core imports the real machinery from `../extraction` (`schema`, `classification`,
-`transform`) — pydantic-only modules, added to `sys.path` in `defs/pipeline.py`.
+Every node emits one `[seam:<name>]` log line — the observability seam.
 
-Every node emits one `[seam:<name>]` log line — the observability seam (a validation_event). Per-node
-lineage + retriability is exactly why Dagster was chosen.
-
-## Run it
+## Run it (locally — no deploy, no spend)
 
 ```bash
 cd services/orchestration
 uv sync
-uv run dg check defs                            # validate
-uv run dg launch --assets reproduction_record   # materialize end to end
-uv run dg dev                                   # lineage UI at localhost:3000
+uv run dg check defs
+uv run dg launch --assets reproduction_record \
+  --config '{"ops":{"reproduction_record":{"ops":{"detect_figures":{"config":{"pdf_path":"/path/to/paper.pdf","no_llm":true}}}}}}'
+uv run dg dev   # optional local lineage UI at localhost:3000
 ```
 
-## Deploy (Render)
+Local runs use Dagster's default ephemeral instance — no Supabase, no Postgres, nothing to deploy.
 
-Dagster's open-source core (Apache 2.0) is self-hosted as a **new** Render web service alongside the
-worker (no Dagster+ required). Deploy-as-code lives in `Dockerfile`, `workspace.yaml`, `dagster.yaml`,
-and the `sde-orchestration-web` service in the repo-root `render.yaml`. Validated locally: image builds,
-container boots, loads `orchestration.definitions`, serves `/server_info` 200.
+## Planned next layer (not faked here)
 
-**Storage reuses the existing Supabase Postgres — isolated to its own `dagster` schema** (validated safe;
-shared `public` was not). Before first deploy, run once in Supabase:
+1. The extractor assembles an `ExecutableModel` (drift/diffusion code) so `reproduce` yields a real
+   verdict via the oracle.
+2. A per-variable classifier fan-out (the `VariableClassification`/`match_role` registry gate).
 
-```sql
-CREATE SCHEMA IF NOT EXISTS dagster;
-```
-
-Then set the five `DAGSTER_PG_*` secrets (from the Supabase **Session pooler**, port 5432) on the Render
-service. `search_path=dagster` is pinned in `dagster.yaml`, so Dagster's ~22 tables never touch `public`
-and Supabase won't auto-expose them. Smoke-test the first boot: confirm the tables landed in `dagster.*`.
-
-## Fill-out order
-
-1. ~~`detect_figures` -> real `figures.detect_serializable` + the human's panel pick.~~ **done.**
-2. ~~`reproduce` -> run the BioModels diffrax harness (fixed seed) twice; two-part verdict.~~ **done** (`oracle.py`).
-3. `read_model` + `extract_variable` -> the real subagents (OpenAI + Pydantic brain), still gated by the
-   classifier layer. They must assemble the `ExecutableModel` (drift/diffusion code) the oracle runs.
-   **next.**
-4. Persist the `ReproductionRecord` to Supabase; surface per-subagent health by variable/parameter type.
+These are future nodes; today the workflow mirrors what the real pipeline actually does.
