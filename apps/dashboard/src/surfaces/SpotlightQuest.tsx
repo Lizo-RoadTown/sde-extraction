@@ -231,11 +231,20 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
         </div>
         {done && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className={cx("rounded-full px-3 py-1 text-sm font-medium",
-              ext.outcome === "successful" ? "bg-present-soft text-present" : "bg-attention-soft text-attention")}>
-              {ext.outcome === "successful" ? "✓ successful — the figure could be reproduced" : "✕ failed — the figure could not be reproduced"}
+            {/* extraction completeness — a REAL signal (what was found vs absent) */}
+            <span className="rounded-full bg-present-soft px-3 py-1 text-sm font-medium text-present">
+              ✓ extraction complete — {finds.length} found · {misses} absent
             </span>
-            <span className="text-xs text-ink-faint">{finds.length} located · {misses} absent</span>
+            {/* figure REPRODUCTION is a separate oracle (re-run the model, compare). It isn't built/run
+                yet, so report it honestly as not-run — never assert "could not be reproduced" with no attempt. */}
+            <span className={cx("rounded-full px-3 py-1 text-sm",
+              ext.figureReproduced === true ? "bg-present-soft text-present"
+                : ext.figureReproduced === false ? "bg-attention-soft text-attention"
+                : "bg-surface-raised text-ink-dim")}>
+              {ext.figureReproduced === true ? "✓ figure reproduced"
+                : ext.figureReproduced === false ? "✕ figure not reproduced"
+                : "figure reproduction — not run yet"}
+            </span>
           </div>
         )}
       </div>
