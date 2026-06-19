@@ -145,6 +145,9 @@ export interface JobTarget {
   mode: "auto" | "figure" | "model" | "whole" | "detect";
   figure_ref?: string;
   model_desc?: string;
+  // The EXACT panel the human picked (page + normalized bbox). Panels share a caption, so the worker
+  // anchors extraction to this region, not the label. See figures.isolate_region.
+  region?: { page: number; bbox_norm: [number, number, number, number] };
   lane?: "walkthrough" | "bulk"; // which audience lane enqueued it (the worker copies it to the extraction)
 }
 

@@ -42,6 +42,7 @@ export function SingleRun() {
   const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<RunPhase>({ kind: "compose" });
+  const [zoom, setZoom] = useState<FigureThumb | null>(null); // the panel being inspected (zoom view)
 
   async function handleFile(f: File | undefined) {
     if (!f) return;
@@ -65,12 +66,18 @@ export function SingleRun() {
     }
   }
 
-  // Human picks a figure → extract exactly that figure (figure mode, by label).
-  async function choose(label: string) {
+  // Human picks ONE panel → extract exactly THAT panel (anchored by its region/bbox, not the label,
+  // since panels share a caption).
+  async function choose(f: FigureThumb) {
     if (phase.kind !== "choosing") return;
-    const target: JobTarget = { mode: "figure", figure_ref: label, lane: "walkthrough" };
+    const label = f.label || `panel (p.${f.page})`;
+    const target: JobTarget = {
+      mode: "figure", figure_ref: label, lane: "walkthrough",
+      region: { page: f.page, bbox_norm: f.bbox_norm },
+    };
     const jobId = await enqueueJob(phase.paperId, label, target);
     if (!jobId) { setPhase({ kind: "failed", message: "Couldn't queue the extraction — are you signed in?" }); return; }
+    setZoom(null);
     setPhase({ kind: "running", jobId, paperId: phase.paperId, stage: "queued" });
   }
 
@@ -181,14 +188,15 @@ export function SingleRun() {
             ) : phase.kind === "choosing" ? (
               <div className="flex flex-col gap-2">
                 <div className="text-[11px] text-ink-faint">
-                  The system found these figures in the paper. Pick the one whose model you want to reproduce.
+                  The system found these panels in the paper. Click one to zoom in and inspect it, then extract its model.
                 </div>
                 <div className="grid max-h-[30rem] grid-cols-2 gap-2 overflow-auto pr-1">
                   {phase.figures.map((f, i) => {
                     const label = f.label || `Figure (p.${f.page})`;
                     return (
                       <button type="button" key={`${f.label ?? "fig"}-${f.page}-${i}`}
-                        onClick={() => choose(f.label || label)}
+                        onClick={() => setZoom(f)}
+                        title="Click to zoom in and inspect"
                         className="flex flex-col gap-1 rounded-md border border-edge bg-surface-raised/40 p-2 text-left transition hover:border-active-edge">
                         {f.thumb ? (
                           <img src={f.thumb} alt={label} className="h-28 w-full rounded border border-edge bg-white object-contain" />
@@ -213,6 +221,38 @@ export function SingleRun() {
           </Card>
         </div>
       </fieldset>
+
+      {/* zoom: inspect one panel up close — what it is + extract it */}
+      {zoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          role="dialog" aria-modal="true" onClick={() => setZoom(null)}>
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col gap-3 overflow-auto rounded-lg border border-edge bg-surface p-4"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-ink">{zoom.label || `Figure (p.${zoom.page})`}</span>
+              <button type="button" onClick={() => setZoom(null)} className="text-xs text-ink-dim hover:text-ink">close ✕</button>
+            </div>
+            {zoom.thumb ? (
+              <img src={zoom.thumb} alt={zoom.label || "panel"} className="max-h-[60vh] w-full rounded border border-edge bg-white object-contain" />
+            ) : (
+              <div className="flex h-64 items-center justify-center rounded border border-dashed border-edge text-xs text-ink-faint">no preview</div>
+            )}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-ink-faint">
+              <Badge tone="slate">p.{zoom.page}</Badge>
+              <span>this is one panel of {zoom.label?.split(" · ")[0] || "the figure"}</span>
+            </div>
+            {zoom.caption && (
+              <div className="rounded-md bg-surface-raised/40 p-2 text-xs text-ink-dim">
+                <span className="text-ink-faint">what it relates to: </span>{zoom.caption}
+              </div>
+            )}
+            <button type="button" onClick={() => choose(zoom)}
+              className="mt-1 w-full rounded-md bg-active-soft py-2 text-sm text-active transition hover:brightness-110">
+              Extract this panel →
+            </button>
+          </div>
+        </div>
+      )}
 
       {phase.kind === "running" && (
         <Card className="flex flex-col items-center gap-3 py-8 text-center">

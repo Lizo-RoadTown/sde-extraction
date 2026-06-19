@@ -111,9 +111,17 @@ def run(
         instruction = _target_instruction(target)
         if mode in ("figure", "auto"):
             try:
-                from figures import isolate_figure
-                label = target.get("figure_ref") if mode == "figure" else None
-                iso = isolate_figure(pdf_path, label=label)
+                region = (target or {}).get("region")  # the EXACT panel the human picked (page + bbox)
+                if mode == "figure" and region:
+                    from figures import isolate_region
+                    iso = isolate_region(
+                        pdf_path, page=int(region["page"]), bbox_norm=region["bbox_norm"],
+                        label=target.get("figure_ref"),
+                    )
+                else:
+                    from figures import isolate_figure
+                    label = target.get("figure_ref") if mode == "figure" else None
+                    iso = isolate_figure(pdf_path, label=label)
             except Exception:  # noqa: BLE001 — isolation is best-effort; never block extraction
                 iso = None
             if iso:

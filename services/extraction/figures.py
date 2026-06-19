@@ -343,3 +343,31 @@ def isolate_figure(pdf_path: str, *, label: Optional[str] = None, scale: float =
         source_sha256=src_sha, image_sha256=_sha256(png),
     )
     return {"png": png, "region": region, "provenance": prov}
+
+
+def isolate_region(pdf_path: str, *, page: int, bbox_norm, label: Optional[str] = None,
+                   caption: Optional[str] = None, scale: float = 2.0) -> dict:
+    """Isolate the EXACT region a human picked (one panel) -> {png, region, provenance}. Anchors by
+    bbox, not label: panels share a caption, so the label isn't unique — the human's pick IS the
+    truth. bbox_norm is page-normalized (x0, y0, x1, y1)."""
+    import fitz
+    doc = fitz.open(pdf_path)
+    try:
+        pg = doc[page - 1]
+        pw, ph = float(pg.rect.width), float(pg.rect.height)
+    finally:
+        doc.close()
+    x0, y0, x1, y1 = bbox_norm
+    region = FigureRegion(
+        page=page, bbox=(x0 * pw, y0 * ph, x1 * pw, y1 * ph), bbox_norm=tuple(bbox_norm),
+        label=label, caption=caption, area=(x1 - x0) * pw * (y1 - y0) * ph, source="panel",
+    )
+    png = rasterize_region(pdf_path, region, scale=scale)
+    with open(pdf_path, "rb") as f:
+        src_sha = _sha256(f.read())
+    prov = FigureProvenance(
+        tool="pymupdf", page=page, bbox=region.bbox, bbox_norm=region.bbox_norm,
+        scale=max(1.0, min(float(scale), MAX_SCALE)), label=label, caption=caption,
+        source_sha256=src_sha, image_sha256=_sha256(png),
+    )
+    return {"png": png, "region": region, "provenance": prov}
