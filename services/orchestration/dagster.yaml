@@ -1,0 +1,15 @@
+# Dagster OSS instance config (read from $DAGSTER_HOME/dagster.yaml).
+# Storage = the existing Supabase Postgres (reused, per decision) so run/event/schedule history
+# persists across deploys. DAGSTER_PG_URL is a dashboard-managed secret on Render — set it to the
+# Supabase SESSION-pooler connection string (IPv4, port 5432), NOT the transaction pooler.
+storage:
+  postgres:
+    postgres_url:
+      env: DAGSTER_PG_URL
+
+# Skeleton deploy = one web service, default in-process run launcher (runs spawn as subprocesses in
+# the webserver container). No daemon yet — add a QueuedRunCoordinator + dagster-daemon service when
+# schedules/sensors are introduced.
+
+telemetry:
+  enabled: false

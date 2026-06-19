@@ -1,0 +1,18 @@
+# Used by the orchestration image build (context = repo root). Keep the context small: the image only
+# needs services/extraction + services/orchestration. Everything heavy/irrelevant is excluded.
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.dg
+**/.pytest_cache
+**/.ruff_cache
+.git
+.github
+.claude
+AT3_review
+research
+docs
+apps
+node_modules
+**/node_modules
+*.pdf

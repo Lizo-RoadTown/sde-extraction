@@ -1,0 +1,4 @@
+# What the dagster-webserver / daemon load: this project's Definitions.
+load_from:
+  - python_module:
+      module_name: orchestration.definitions
