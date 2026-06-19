@@ -1,57 +1,65 @@
 # SDE_Extraction
 
-**Status:** 2026-05-31 — seeded. Heavy-research phase incoming. Web/UI components possible later.
+Automated extraction of stochastic-differential-equation (SDE) epidemiological models from academic
+papers into structured, present/absent models — then re-simulated to check the paper's figure can be
+reproduced. A human verifies every result. Wired into the-loom (project intelligence + memory MCP +
+observatory).
 
-A research-heavy project. Starts with deep literature/data work; may grow into a full application with backend + frontend + website over time. Wired into the-loom (project intelligence + memory MCP + observatory) so the research methodology and any future build work both benefit from the platform.
+## What it does
 
-## What this repo is (today)
+1. A paper is uploaded. The system finds its figures; a person picks the one figure they want the
+   model for.
+2. The extraction brain (OpenAI + Pydantic) reads the model behind that figure into a structured,
+   present/absent form — every value carried with its quote, page, and a hash of its source.
+3. Each term's lift off the page is recorded (the recorded transformation), so nothing is a black box.
+4. The model is re-simulated with the BioModels curation harness (diffrax, fixed seed). Running it
+   twice and getting the same result is the reproducibility check — a verdict that is only ever set
+   from a real run, never guessed.
+5. A person reviews the result before it is kept. That human verdict is how the system's confidence is
+   earned.
 
-- A research workspace: literature, data analyses, synthesized findings, decision proposals
-- A loom-aware consuming project: one project-local instance attached (`sde-extraction-dev`)
-- A skill-bundled repo: the 16 methodology skills live locally in `skills/` + `skills_private/`
+## Architecture
 
-## What this repo may become (later)
+| Surface | Where | What |
+|---|---|---|
+| `apps/dashboard` | React + Vite, Vercel | the app: upload, choose figure, watch it work, verify, library |
+| `apps/docs` | Astro Starlight, Vercel | public documentation for scientists |
+| `services/extraction` | Python + Docker, Render | the worker: polls Supabase, runs the OpenAI+Pydantic brain; holds the schema, classification registries, recorded-transformation machinery, figure detection, and the reproduction oracle |
+| `services/orchestration` | Dagster, self-host | the deterministic backbone (skeleton): a dynamic-task-mapping DAG running each deterministic stage as an observable node, with a per-variable fan-out; autonomy confined to subagent nodes |
+| Supabase | Postgres + storage | data + a read-only public API (`public_models` view) |
+| `plugins/sde-extraction-guard` | Claude Code plugin | hook-enforced schema guard (`scripts/check_schema.py`) |
 
-- A web app with backend services
-- A UI/UX surface for whatever the research output ends up being
-- Additional loom instances when those surfaces materialize (e.g., `sde-extraction-app` for a deployed product, mirroring the Summer 2026 Hub two-instance pattern)
+The OpenAI + Pydantic extraction brain is the core and is not replaced; external tools are borrowed for
+their architecture, not their models.
 
 ## Layout
 
 ```text
 SDE_Extraction/
-├── research/                        Primary work today
-│   ├── literature/                  Lit reviews, papers, annotated bibliographies
-│   ├── data/                        Datasets (gitignored if large; see research/data/README.md)
-│   ├── notebooks/                   Analysis notebooks
-│   └── findings/                    Synthesized findings + write-ups
-│
-├── apps/                            Future website/frontend (empty placeholder)
-├── services/                        Future backend services (empty placeholder)
-│
+├── apps/
+│   ├── dashboard/                   React/Vite app (Vercel)
+│   └── docs/                        Astro Starlight docs site (Vercel)
+├── services/
+│   ├── extraction/                  Python worker + brain, schema, classification, transform, figures, oracle
+│   └── orchestration/               Dagster orchestrator (deterministic backbone)
+├── supabase/migrations/             Database schema (0001..; 0012 = public read-only API)
+├── scripts/check_schema.py          The schema guard (run by the guard plugin)
+├── plugins/sde-extraction-guard/    The guard, as a hook plugin
 ├── docs/
-│   ├── proposals/                   Architectural / design decisions before code
-│   ├── plans/                       Dated execution plans (YYYY-MM-DD-name.md)
-│   ├── test-runs/                   Friction-surface logs from real work
+│   ├── proposals/                   Design decisions before code
+│   ├── decisions/                   ADRs
 │   ├── architecture/                Living architecture docs
-│   └── decisions/                   ADRs (decision records)
-│
-├── scripts/                         Utility scripts
-│
-├── skills/                          9 public methodology skills (bundled)
-├── skills_private/                  7 private methodology skills (bundled)
-│
-├── .project-intelligence/           Loom instance state (the-loom integration)
-│   ├── instances.json
-│   ├── README.md
-│   └── sde-extraction-dev/          Current single instance
-│
+│   ├── plans/                       Dated execution plans
+│   └── test-runs/                   Friction-surface logs
+├── skills/ · skills_private/        Bundled methodology skills
+├── AT3_review/                      READ-ONLY reference (prior HITL review system; git-ignored)
+├── .project-intelligence/           Loom instance state (sde-extraction-dev)
 ├── CLAUDE.md                        Project context auto-loaded by Claude Code
-├── .env.template                    Copy to .env; gitignored
-├── .gitignore
-├── LICENSE                          Apache 2.0
 └── README.md                        This file
 ```
+
+`AT3_review/` is read-only reference, not part of the runtime. `Agent Drafts/` vs `Human validated/`
+record the human-in-the-loop division of labor (agents write drafts; only Liz promotes to validated).
 
 ## Discipline plugin (required)
 
@@ -60,43 +68,25 @@ SDE_Extraction/
 /plugin install make-skills-discipline@lizo-skills
 ```
 
-(Being renamed to `loom-discipline`; either name works during the transition.)
+(Being renamed to `loom-discipline`; either name works during the transition.) The plugin enforces
+PROBE-before-asserting, file:line citation, dev-tooling-vs-runtime distinction, friction-as-memory
+writes, skill-citation, and the layered-explanation pattern.
 
-The plugin enforces PROBE-before-asserting, file:line citation, dev-tooling-vs-runtime distinction, friction-as-memory writes, skill-citation, and the layered-explanation pattern.
+## Setup (loom integration)
 
-## Setup
+1. Clone and `cd` into the repo; install the discipline plugin (above).
+2. Copy `.env.template` to `.env` and fill in `LOOM_PROJECT_ID=sde-extraction-dev` plus the OTEL
+   exporter endpoint/headers (copy from `the-loom/.env`).
+3. Open in Claude Code. The plugin loads, `memory_recall` surfaces prior context, telemetry flows to
+   Grafana tagged `project_id=sde-extraction-dev`.
 
-1. **Clone and `cd` into the repo.**
-2. **Install the discipline plugin** (above).
-3. **Copy `.env.template` to `.env`** and fill in:
-   - `LOOM_PROJECT_ID=sde-extraction-dev`
-   - `OTEL_EXPORTER_OTLP_ENDPOINT` (copy from `the-loom/.env`)
-   - `OTEL_EXPORTER_OTLP_HEADERS` (copy from `the-loom/.env`)
-4. **Register with the-loom Project Registry**:
-   ```powershell
-   curl -X POST https://loom-project-registry.onrender.com/projects `
-     -H "Content-Type: application/json" `
-     -d '{\"slug\": \"sde-extraction-dev\", \"name\": \"SDE Extraction (Research)\", \"description\": \"Research-heavy project with future web/UI components\"}'
-   ```
-   (Self-host mode — no auth required today.)
-5. **Open in Claude Code.** The discipline plugin loads. `memory_recall` will surface relevant prior context. Telemetry flows to Grafana tagged with `project_id=sde-extraction-dev`.
+See [`docs/architecture/loom-wiring.md`](docs/architecture/loom-wiring.md) for the integration map.
 
-See [`docs/architecture/loom-wiring.md`](docs/architecture/loom-wiring.md) for the full integration map (created in this seed).
+## Methodology skills (bundled)
 
-## Methodology skills (bundled in this repo)
-
-The full set of methodology skills is in `skills/` and `skills_private/`. The most relevant for research-heavy work:
-
-- `skills/deep-research-pattern` — research methodology (the primary playbook for heavy lit/data work)
-- `skills/eval-deep-research` — evaluating research outputs
-- `skills/document-parsing` — extracting structure from source documents
-- `skills/documentation` — Diátaxis docs methodology (for writing findings)
-- `skills/layered-explanation` — ELI5 → quick reference → depth → mental model
-- `skills_private/proposal-authoring` — for writing decision proposals + ADRs
-- `skills_private/lessons-learned` — friction-as-memory operational pattern
-- `skills_private/agentic-upskilling` — the observe → promote → codify loop
-
-Invoke skills by name in your responses (per the discipline plugin).
+In `skills/` and `skills_private/`. Most relevant: `deep-research-pattern`, `eval-deep-research`,
+`document-parsing`, `documentation`, `layered-explanation`, and (private) `proposal-authoring`,
+`lessons-learned`, `agentic-upskilling`. Invoke skills by name (per the discipline plugin).
 
 ## License
 

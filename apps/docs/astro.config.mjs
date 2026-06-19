@@ -40,6 +40,7 @@ export default defineConfig({
           label: "How it works",
           items: [
             { label: "What it recognizes", slug: "explanation/recognizes" },
+            { label: "Parameters", slug: "explanation/parameters" },
             { label: "Where each value comes from", slug: "explanation/provenance" },
             { label: "The structured map", slug: "reference/schema" },
           ],
@@ -48,6 +49,9 @@ export default defineConfig({
           label: "Watch it work",
           items: [
             { label: "Watch it work", slug: "explanation/observability" },
+            { label: "How sure it is", slug: "explanation/confidence" },
+            { label: "How it earns its confidence", slug: "explanation/agent-health" },
+            { label: "Where the data flows", slug: "explanation/extraction-health" },
           ],
         },
         {
