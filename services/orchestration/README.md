@@ -16,7 +16,7 @@ science.
 | `fan_out_variables` | per-variable fan-out | **real** — Dagster dynamic mapping (`DynamicOut` / `.map` / `.collect`) |
 | `extract_variable` (mapped) | per-variable lift | lift content **placeholder** (subagent not wired); the **Pydantic classifier layer is real** — `VariableClassification` validated, role gated against the registry via `match_role` |
 | `reconcile` | reconcile | **real** — collects per-variable `TermTransform`s into a `ReproductionRecord` |
-| `reproduce` | verify (re-sim) | verdict logic **real** (two-part); the diffrax oracle is **not wired**, so the verdict is honestly `not_run` — never a guessed verdict |
+| `reproduce` | verify (re-sim) | **real** — calls `oracle.run_reproduction` (the BioModels diffrax harness, fixed seed, run twice → hash-compare) when a runnable `ExecutableModel` exists; with the placeholder lift no model is assembled, so the verdict is honestly `not_run`. Oracle itself tested in `tests/test_oracle.py` |
 
 The reproducibility core imports the real machinery from `../extraction` (`schema`, `classification`,
 `transform`) — pydantic-only modules, added to `sys.path` in `defs/pipeline.py`.
@@ -55,8 +55,8 @@ and Supabase won't auto-expose them. Smoke-test the first boot: confirm the tabl
 ## Fill-out order
 
 1. ~~`detect_figures` -> real `figures.detect_serializable` + the human's panel pick.~~ **done.**
-2. `reproduce` -> build the `ExecutableModel` and run the BioModels diffrax harness (Euler-Maruyama,
-   fixed seed) twice; set `ran_ok` + the result hashes so `decide()` yields a real verdict. **next.**
+2. ~~`reproduce` -> run the BioModels diffrax harness (fixed seed) twice; two-part verdict.~~ **done** (`oracle.py`).
 3. `read_model` + `extract_variable` -> the real subagents (OpenAI + Pydantic brain), still gated by the
-   classifier layer.
+   classifier layer. They must assemble the `ExecutableModel` (drift/diffusion code) the oracle runs.
+   **next.**
 4. Persist the `ReproductionRecord` to Supabase; surface per-subagent health by variable/parameter type.

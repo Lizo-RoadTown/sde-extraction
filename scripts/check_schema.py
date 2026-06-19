@@ -143,6 +143,20 @@ def main() -> int:
         print(f"  FAIL  transform: {e}")
 
     try:
+        import oracle  # imports clean without diffrax (lazy); the curation-check path needs no solver
+        m = tr.ExecutableModel(
+            variable_names=["x"], parameter_names=["a"], initial_values={},  # missing IC
+            parameter_values={"a": 1.0}, initial_time=0.0, final_time=1.0,
+            drift_code="return [-p[0]*y[0]]", diffusion_code="return [0.0]",
+        )
+        rec = oracle.run_reproduction(m)  # curation check fails (missing IC) -> failed, no diffrax run
+        assert rec.ran_ok is False and rec.status == "failed"
+        print("  ok    oracle: curation-check gate works; verdict only from a real run (diffrax tested separately)")
+    except Exception as e:  # noqa: BLE001
+        fails.append(f"oracle: {type(e).__name__}: {e}")
+        print(f"  FAIL  oracle: {e}")
+
+    try:
         import classification as c
         c.ModelClassification(family_name="levy-jump")
         c.VariableClassification(symbol="S", role="susceptible")

@@ -134,14 +134,20 @@ def reconcile(context, per_variable: list) -> dict:
     return record.model_dump()
 
 
-# --- DETERMINISTIC: verify by re-simulation (the reproduction oracle) -----------------
-# Real impl: build ExecutableModel -> diffrax (Euler-Maruyama, fixed seed) twice -> hash-compare.
-# Skeleton: no executable model wired -> verdict is honestly 'not_run' (NEVER a guessed verdict).
+# --- DETERMINISTIC: verify by re-simulation (the REAL reproduction oracle) -------------
+# If a runnable ExecutableModel exists, run the BioModels diffrax harness twice at a fixed seed and let
+# the two-part verdict decide (oracle.run_reproduction -> ReproductionRecord.decide). With the per-
+# variable subagent lift not yet wired, no model is assembled -> the verdict is honestly 'not_run'
+# (NEVER a guessed verdict). The oracle itself is real and tested (tests/test_oracle.py).
 @dg.op
 def reproduce(context, record_dict: dict) -> dict:
     record = tr.ReproductionRecord(**record_dict)
-    record.note = "executable model + diffrax oracle not wired yet"
-    record.decide()  # ran_ok=None, no result hashes -> 'not_run'
+    if record.model is not None and (record.model.drift_code or "").strip():
+        import oracle  # lazy: pulls diffrax/jax only when there's a model to run
+        oracle.run_reproduction(record.model, seed=record.seed, record=record)
+    else:
+        record.note = "no executable model (per-variable subagent lift not wired) - verdict deferred"
+        record.decide()  # ran_ok=None, no result hashes -> 'not_run'
     _seam(context, "reproduce_check", status=record.status,
           figure_reproduced=record.figure_reproduced)
     context.add_output_metadata({
