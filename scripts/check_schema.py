@@ -54,7 +54,7 @@ def main() -> int:
     print("[1/4] imports")
     # Pure-schema modules (only need pydantic) — these MUST import. processor only needs schema at
     # module load (openai/locator are lazy), so it surfaces FigurePanels-class name errors here.
-    for m in ("schema", "classification", "contracts", "facets", "graph", "figures", "processor"):
+    for m in ("schema", "classification", "contracts", "facets", "graph", "figures", "transform", "processor"):
         try_import(m)
     # Wiring modules — import if their deps exist; a bad NAME still fails (not skipped).
     for m in ("db", "hooks", "assemble", "locator", "worker"):
@@ -119,6 +119,26 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         fails.append(f"figures: {type(e).__name__}: {e}")
         print(f"  FAIL  figures: {e}")
+
+    try:
+        import transform as tr
+        from schema import Present
+        pres = Present(status="present", value="-x", meaning="drift", quote="dx = -x dt", page=2)
+        tt = tr.TermTransform(
+            field_path="drift_terms[0]", variable="x", before=pres,
+            steps=[tr.TransformStep(transformation="log-transform", detail="x -> -x")], after="-x",
+        )
+        assert tt.steps_valid()
+        bad = tr.TermTransform(field_path="d", variable="x", before=pres,
+                               steps=[tr.TransformStep(transformation="nope")])
+        assert not bad.steps_valid()  # unknown transformation rejected (unless proposed-new)
+        assert tr.ReproductionRecord(result_sha256="a", rerun_sha256="a").decide().figure_reproduced is True
+        assert tr.ReproductionRecord(result_sha256="a", rerun_sha256="b").decide().figure_reproduced is False
+        assert tr.ReproductionRecord().decide().status == "not_run"  # no run -> no verdict (never guessed)
+        print("  ok    transform: term lift validates; reproduction verdict only from same-results check")
+    except Exception as e:  # noqa: BLE001
+        fails.append(f"transform: {type(e).__name__}: {e}")
+        print(f"  FAIL  transform: {e}")
 
     try:
         import classification as c
