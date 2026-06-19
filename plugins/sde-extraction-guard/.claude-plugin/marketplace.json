@@ -1,0 +1,11 @@
+{
+  "name": "sde-extraction-dev-plugins",
+  "owner": { "name": "Lizo-RoadTown" },
+  "plugins": [
+    {
+      "name": "sde-extraction-guard",
+      "source": "./",
+      "description": "Schema guard (hook-enforced) + the recorded-transformation discipline."
+    }
+  ]
+}
