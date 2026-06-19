@@ -54,6 +54,7 @@ export default defineConfig({
           label: "Use it",
           items: [
             { label: "Add a paper and check it", slug: "how-to/add-and-verify" },
+            { label: "Get the data (public API)", slug: "how-to/public-api" },
           ],
         },
       ],
