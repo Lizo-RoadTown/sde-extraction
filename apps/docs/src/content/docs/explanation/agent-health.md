@@ -3,8 +3,9 @@ title: How it earns its confidence
 description: The parts that do the work, and how a person's review turns into earned confidence over time.
 ---
 
-The system's confidence is not set by hand. It is **earned** from the record of human reviews. This
-page explains how, and what you can see today.
+The intended design is that the system's confidence is not set by hand — it is **earned** from the
+record of human reviews. This page explains that intended mechanism, and is clear about what actually
+runs today (the Reader's real counts) versus what is still planned (the feedback-into-confidence loop).
 
 ## The parts that do the work
 
@@ -22,15 +23,21 @@ many papers it has processed, how many succeeded or failed, how many are waiting
 many a person has since confirmed. The Router, Checker, and Keeper are being built; on screen they are
 clearly marked as planned, never shown with made-up numbers.
 
-## How a review becomes confidence
+## How a review becomes confidence _(planned)_
 
-This is the heart of it. When a person reviews a result and confirms or corrects it, that verdict is
-fed back to the part that did the work. It raises or lowers that part's confidence for **that kind of
-work**: that kind of variable, that kind of parameter, that kind of figure.
+:::note[Planned — not built yet]
+This is the intended mechanism. The human verdicts are recorded today, but nothing yet reads them back
+into a per-type confidence score; that loop is not implemented.
+:::
 
-So the confidence you see is the system's real track record on work like the one in front of you, and
-it improves with every review. A part that has been confirmed many times on a kind of model is trusted
-more there; one that has been corrected often is trusted less, and flagged for closer human attention.
+The intended heart of it: when a person reviews a result and confirms or corrects it, that verdict
+would be fed back to the part that did the work, raising or lowering its confidence for **that kind of
+work** — that kind of variable, that kind of parameter, that kind of figure.
+
+The aim is that the confidence reflects a real track record on work like the one in front of you, and
+improves with every review: a part confirmed many times on a kind of model is trusted more there; one
+corrected often is trusted less and flagged for closer human attention. (Today the dashboard shows
+real **completeness** instead — see [How sure it is](/explanation/confidence/).)
 
 ## What is not measured yet
 

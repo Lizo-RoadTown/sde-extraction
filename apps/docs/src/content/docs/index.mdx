@@ -30,10 +30,11 @@ paper.
 
 - It starts from a figure in the paper and finds the model behind it: the equations, variables,
   parameters, and starting values.
-- For every value, it shows the exact quote and page from the paper, so you can confirm it against
-  the source. If the paper does not state a value, it says "not stated" instead of filling it in.
-- It re-draws the figure from the extracted model. If the re-drawn figure matches, the model
-  produces the same result.
+- For every value, it shows the exact quote and page from the paper — and highlights the spot on the
+  page — so you can confirm it against the source. If the paper does not state a value, it says
+  "not stated" instead of filling it in.
+- _Planned:_ re-drawing the figure from the extracted model to check it reproduces the same result.
+  The re-simulation tool is built and tested, but is not yet part of the live extraction run.
 - Every step is observable and recorded.
 
 ## Find what you need
@@ -45,8 +46,9 @@ paper.
   <Card title="Check a value yourself" icon="approve-check">
     How each number traces to an exact quote and page in the original paper.
   </Card>
-  <Card title="Reproduce the results" icon="seti:image">
-    How the figure is re-drawn from the model.
+  <Card title="Reproduce the results (planned)" icon="seti:image">
+    How the figure will be re-drawn from the model. The re-simulation tool is built and tested; it
+    is not yet wired into the live run.
   </Card>
   <Card title="What 'not stated' means" icon="information">
     Why a missing value is reported instead of filled in.
