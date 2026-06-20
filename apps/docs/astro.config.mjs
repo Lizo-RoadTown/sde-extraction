@@ -42,6 +42,7 @@ export default defineConfig({
             { label: "What it recognizes", slug: "explanation/recognizes" },
             { label: "Parameters", slug: "explanation/parameters" },
             { label: "Where each value comes from", slug: "explanation/provenance" },
+            { label: "The magnifying glass", slug: "explanation/magnifying-glass" },
             { label: "The structured map", slug: "reference/schema" },
           ],
         },
@@ -73,6 +74,7 @@ export default defineConfig({
             {
               label: "Logic & decisions",
               items: [
+                { label: "The position locator (magnifying glass)", slug: "dev/logic/position-locator" },
                 { label: "Triaging failures across the boundary", slug: "dev/operations/failure-triage" },
               ],
             },
