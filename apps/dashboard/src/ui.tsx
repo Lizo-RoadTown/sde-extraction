@@ -59,19 +59,22 @@ export function StatCard({ label, value, tone = "slate" }: { label: string; valu
   );
 }
 
-// Confidence chip — the embedded signal from Extraction Health that travels into
-// Verify + Library. Banded sage/amber/rose (exception-marking). Structure-level:
-// the score is not engine-produced yet, so callers pass mock values for now.
-export function ConfidenceChip({ score }: { score?: number }) {
-  if (score == null) return null;
-  const dot = score >= 0.75 ? "bg-present" : score >= 0.5 ? "bg-attention" : "bg-invalid";
+// Completeness chip — a REAL, computed signal: how many of the figure's required fields came back
+// present vs absent (and how many were located on the page). Read straight from the extraction, never
+// fabricated. Banded by completeness. This is NOT "earned confidence" (human-verdict feedback, not
+// built yet) — it is honest extraction completeness, and it says so on hover.
+export function CompletenessChip({ present, total, located }: { present: number; total: number; located?: number }) {
+  if (!total) return null;
+  const frac = present / total;
+  const dot = frac >= 0.75 ? "bg-present" : frac >= 0.4 ? "bg-attention" : "bg-invalid";
+  const loc = located != null ? `; ${located} located on the page` : "";
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full border border-edge px-1.5 py-0.5 text-[10px] text-ink-dim"
-      title={`extractor confidence on this document type: ${score.toFixed(2)} (sample — not engine-produced yet)`}
+      title={`extraction completeness: ${present} of ${total} required fields present, ${total - present} absent${loc}`}
     >
       <span className={cx("h-1.5 w-1.5 rounded-full", dot)} />
-      <span className="mono">{score.toFixed(2)}</span>
+      <span className="mono">{present}/{total}</span>
     </span>
   );
 }

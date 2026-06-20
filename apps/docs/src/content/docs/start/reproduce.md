@@ -1,20 +1,26 @@
 ---
 title: Follow a paper, step by step
-description: How the model is read out of one paper, step by step, with the source for every value and the system's confidence shown at each step.
+description: How the model is read out of one paper, step by step, with the source for every value shown at each step.
 ---
 
 This shows how the model is read out of one paper, step by step. You can use it on your own model or
-on another paper. At each step you can see what happened, watch it run, see the system's confidence,
-and check that piece against the original paper. You do not need to run anything or know any software.
+on another paper. At each step you can see what happened, watch it run, and check that piece against
+the original paper. You do not need to run anything or know any software.
 
 ```mermaid
 flowchart LR
   A["Choose a figure"] --> B["Variables identified"]
   B --> C["Parameters matched to it"]
   C --> D["Each term lifted, with its source"]
-  D --> E["Figure re-drawn"]
-  E --> F["Reproduced?"]
+  D -.-> E["Figure re-drawn (planned)"]
+  E -.-> F["Reproduced? (planned)"]
 ```
+
+:::note[Steps 1–5 are live; step 6 (re-drawing) is planned]
+Everything through "each term lifted with its source" runs today. Re-drawing the figure to check it
+reproduces is built and tested but **not yet in the live run** — it's shown below so the full standard
+is clear.
+:::
 
 ## 1. You choose one figure
 
@@ -45,16 +51,20 @@ To check a piece: open that page, find the highlighted sentence, and confirm it 
 A fixed map (the schema) lists every piece a model of this kind needs. Each slot is either filled
 from the paper or shown as a gap, so no required piece is skipped without notice.
 
-## 6. The figure is re-drawn from the model
+## 6. The figure is re-drawn from the model _(planned)_
 
-The figure is re-drawn using only the extracted model, not the original image. If it matches the
-paper's figure, the model produces the same result.
+The intended final check: re-draw the figure using only the extracted model, not the original image —
+if it matches the paper's figure, the model produces the same result. The re-simulation tool (diffrax,
+fixed seed) is built and tested, but turning the lifted values into an executable model is not yet part
+of the live run, so this step does not run today.
 
 ## What you can see
 
 - You can watch the process run, step by step.
-- Where the system is unsure, it shows its confidence.
-- Each area publishes its statistics.
+- Each extraction shows how **complete** it is — how many required fields came back present vs absent.
+  (A per-type "earned confidence" score, raised and lowered by human review, is _planned_, not built.)
+- The extraction step publishes real counts; other stages are marked "not yet instrumented" rather
+  than showing made-up numbers.
 
 ## Further reading
 

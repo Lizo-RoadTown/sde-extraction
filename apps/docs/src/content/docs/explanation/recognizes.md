@@ -9,9 +9,9 @@ use the same letter for different things.
 
 What it recognizes is a library of knowledge that grows. The lists below are what it knows so far.
 When a paper brings a kind of model or a role that is not yet in the library, a reviewer confirms it
-and it is added, so the library widens as more papers come through. For the parts it knows so far, you
-can see how sure it is on each one in [Watch it work](/explanation/observability/), where every part
-of the process reports its own confidence.
+and it is added, so the library widens as more papers come through. You can follow the process and
+check each part against the paper in [Watch it work](/explanation/observability/); each extraction
+also shows its real **completeness** (how much was found) — see [How sure it is](/explanation/confidence/).
 
 ## How randomness enters the model
 

@@ -1,9 +1,9 @@
 # SDE_Extraction
 
 Automated extraction of stochastic-differential-equation (SDE) epidemiological models from academic
-papers into structured, present/absent models — then re-simulated to check the paper's figure can be
-reproduced. A human verifies every result. Wired into the-loom (project intelligence + memory MCP +
-observatory).
+papers into structured, present/absent models — with re-simulation to check the paper's figure can be
+reproduced as the planned final gate (the harness is built and tested; not yet in the live run). A
+human verifies every result. Wired into the-loom (project intelligence + memory MCP + observatory).
 
 ## What it does
 
@@ -12,11 +12,12 @@ observatory).
 2. The extraction brain (OpenAI + Pydantic) reads the model behind that figure into a structured,
    present/absent form — every value carried with its quote, page, and a hash of its source.
 3. Each term's lift off the page is recorded (the recorded transformation), so nothing is a black box.
-4. The model is re-simulated with the BioModels curation harness (diffrax, fixed seed). Running it
-   twice and getting the same result is the reproducibility check — a verdict that is only ever set
-   from a real run, never guessed.
-5. A person reviews the result before it is kept. That human verdict is how the system's confidence is
-   earned.
+4. _Planned:_ the model is re-simulated with the BioModels curation harness (diffrax, fixed seed) —
+   running it twice and getting the same result is the reproducibility check, a verdict only ever set
+   from a real run, never guessed. The harness is built and tested, but turning the lifted values into
+   an executable model is not yet wired into the live run.
+5. A person reviews the result before it is kept. (A per-type confidence score _earned_ from those
+   human verdicts is planned; today each extraction shows its real completeness — present vs absent.)
 
 ## Architecture
 

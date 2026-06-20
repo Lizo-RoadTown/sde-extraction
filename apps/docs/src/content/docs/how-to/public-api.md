@@ -32,7 +32,7 @@ Each record is one extracted model with its paper details:
 | `doi` | the paper's DOI |
 | `formulation_family` | the kind of SDE formulation |
 | `status` | where the result is in review |
-| `figure_reproduced` | whether re-simulating the model reproduced the figure |
+| `figure_reproduced` | whether re-simulating the model reproduced the figure — _currently null for all rows; the reproduction step is not yet in the live run (planned)_ |
 | `model` | the full extracted model (variables, parameters, terms) |
 | `created_at`, `updated_at` | timestamps |
 
@@ -78,9 +78,6 @@ style, so you can pick columns and filter without downloading everything:
 
 # only models for a given pathogen
 ...?pathogen=eq.Cholera
-
-# only results that reproduced the figure
-...?figure_reproduced=is.true
 
 # page through results
 ...?limit=20&offset=40

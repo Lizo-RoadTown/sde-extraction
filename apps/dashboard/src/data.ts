@@ -500,3 +500,36 @@ export async function loadOrchestrationRuns(limit = 25): Promise<OrchestrationRu
   if (error) { console.error("loadOrchestrationRuns:", error.message); return []; }
   return (data as OrchestrationRun[]) ?? [];
 }
+
+// ---- real, computed extraction completeness (replaces the old fake confidence) ----------------
+// A genuine signal derived from the extraction itself: how many of the figure's required fields came
+// back present vs absent, and how many present ones the locator pinned on the page. No fabrication —
+// every count is read from the stored model. This is NOT "earned confidence" (that needs human-verdict
+// telemetry, not built yet); it is honest extraction completeness.
+export interface SlotCounts { present: number; absent: number; total: number; located: number; }
+
+export function slotCounts(ext: FigureExtraction): SlotCounts {
+  let present = 0, absent = 0, located = 0;
+  const visit = (s: Slot) => {
+    if (s.status === "present") { present++; if (s.located) located++; }
+    else absent++;
+  };
+  ext.variables.forEach((v) => { visit(v.meaning); visit(v.initialValue); });
+  ext.parameters.forEach((p) => { visit(p.value); visit(p.meaning); visit(p.units); });
+  ext.driftTerms.forEach((t) => visit(t.expression));
+  ext.diffusionTerms.forEach((t) => visit(t.expression));
+  visit(ext.timeSpan.initialTime); visit(ext.timeSpan.finalTime);
+  return { present, absent, total: present + absent, located };
+}
+
+// ---- real telemetry heartbeat (replaces the hardcoded "engine + loom: live" pill) -------------
+// The validation_events table IS the telemetry/loom spine; its most recent row is genuine evidence of
+// activity. Returns the latest event timestamp, or null if there's been none (honest "no activity").
+export async function loadHeartbeat(): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("validation_events").select("created_at")
+    .order("created_at", { ascending: false }).limit(1);
+  if (error) { console.error("loadHeartbeat:", error.message); return null; }
+  return (data?.[0]?.created_at as string | undefined) ?? null;
+}

@@ -1,30 +1,27 @@
 ---
 title: How sure it is
-description: Confidence is reported part by part, so you can see exactly where the system is solid and where it is unsure.
+description: Today each extraction shows its real completeness — how many required fields came back present vs absent. A per-type earned-confidence score is planned.
 ---
 
-The system does not give you one confidence number for the whole result. Each part of the work carries
-its **own** confidence, so you can see exactly where it is solid and where it is unsure.
+## What you see today: completeness
 
-## Part by part
+Each extraction shows its **completeness** — how many of the fields the figure needs came back
+**present** vs **absent**, read straight from the result (e.g. `12/18`). This is a real count, not a
+score: it tells you how much of the model was found, and the absent slots tell you exactly what to
+check. A value that was located on the page also shows that (see
+[The magnifying glass](/explanation/magnifying-glass/)).
 
-| Part of the work | What its confidence tells you |
-|---|---|
-| Identify variables | how sure it is it found the right variables for this figure |
-| Match parameters | how sure it is each constant belongs to this figure |
-| Lift each value | how sure it is a value was read correctly, word for word |
-| Check completeness | how sure it is nothing the figure needs was missed |
-| Re-draw the figure | how closely the re-drawn figure matches the one in the paper |
+This is honest about what's known: it does **not** claim how *likely-correct* a value is — only whether
+it was found, and whether it was traced to a spot on the page.
 
-Reading the confidence next to each part tells you where to look closely. A high number on "lift each
-value" and a low one on "check completeness", for example, means the values it found look right but
-something the figure needs may be missing.
+## Planned: earned, per-type confidence
 
-## The confidence is earned
+:::note[Planned — not built yet]
+The mechanism below is the intended design. There is no confidence-scoring code in the system today;
+the dashboard shows completeness (above), not an earned score.
+:::
 
-These numbers are **earned, not assigned**. Every time a person reviews a result and confirms or
-corrects it, that verdict raises or lowers the confidence for that kind of work. So the numbers reflect
-the system's real track record, and they improve as more papers are reviewed.
-
-For how that feedback works and what is running today, see
-[How it earns its confidence](/explanation/agent-health/).
+The plan is a score that is **earned, not assigned**: every time a person reviews a result and confirms
+or corrects it, that verdict would raise or lower the confidence for that *kind* of work, so the numbers
+reflect a real track record that improves as more papers are reviewed. For the intended feedback path
+and what actually runs today, see [How it earns its confidence](/explanation/agent-health/).
