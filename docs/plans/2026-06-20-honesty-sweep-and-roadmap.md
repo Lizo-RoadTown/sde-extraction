@@ -12,6 +12,25 @@ Two kinds of fix:
 
 Status legend: ☐ not started · ◐ in progress · ☑ done
 
+## Progress — 2026-06-20 (autonomous session)
+
+**Phase 1 done** — built real signals where the feature was wanted, didn't gut:
+- Dashboard: fake confidence → real **completeness** (present/absent, `slotCounts`); verify queue
+  ordered least-complete-first; Library shows completeness + honest "human-verified" badge; **real**
+  Library search + Pathogen facet (from data); header pill → **real telemetry heartbeat**. (test branch)
+- Docs: reproduction + earned-confidence relabeled **planned**; pages lead with the real completeness
+  signal; `figure_reproduced` noted null. **Published to `main`** (corrected claims that were live).
+- `/fingerprint`: left as the unlinked dev sandbox (not user-facing).
+
+**Phase 2 finding:** reproduction (#10) can't be wired without first building the verbatim→executable
+**transform** step (`drift_code`/`diffusion_code` aren't in the live model) — a delicate core
+capability; left for a hands-on session, not autonomous.
+
+**Still live on production (`main`):** the dashboard honesty fixes are on `test/dagster-skeleton` only
+(entangled with the path-selector / orchestration work — can't cherry-pick cleanly), so production's
+dashboard still shows the old fake confidence until the branch merges. **Decision needed: merge
+`test/dagster-skeleton` → `main`, or a staged landing.**
+
 ---
 
 ## Phase 1 — Honesty sweep (make the site true *now*)
