@@ -61,6 +61,23 @@ export default defineConfig({
             { label: "Get the data (public API)", slug: "how-to/public-api" },
           ],
         },
+        // Developer documentation — for building/changing the system, not using it. Collapsed and
+        // badged so it stays clearly separate from the scientist-facing content above. Grows as pages
+        // are written (architecture, decisions, contributing); each added when it is real.
+        {
+          label: "Developer documentation",
+          collapsed: true,
+          badge: { text: "Dev", variant: "note" },
+          items: [
+            { label: "Overview", slug: "dev" },
+            {
+              label: "Logic & decisions",
+              items: [
+                { label: "Triaging failures across the boundary", slug: "dev/operations/failure-triage" },
+              ],
+            },
+          ],
+        },
       ],
     }),
   ],
