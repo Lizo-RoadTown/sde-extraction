@@ -12,10 +12,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Optional
 
 import psycopg
 from psycopg.rows import dict_row
+
+# Which Postgres schema this worker operates in. Lets two workers run the SAME code over SEPARATE
+# data: the OpenAI/Pydantic (direct) path uses public (default); the Dagster + OpenAI/Pydantic path
+# sets APP_SCHEMA=dagster_app. Unqualified table names in this module resolve via the search_path we
+# set on connect, so no query needs to change.
+_APP_SCHEMA = os.environ.get("APP_SCHEMA", "").strip()
+_VALID_SCHEMA = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")  # guard: it's our own env, but stay strict
 
 
 def get_db_url() -> Optional[str]:
@@ -35,7 +43,14 @@ def connect() -> psycopg.Connection:
     url = get_db_url()
     if not url:
         raise RuntimeError("DATABASE_URL not set")
-    return psycopg.connect(url, row_factory=dict_row)
+    conn = psycopg.connect(url, row_factory=dict_row)
+    if _APP_SCHEMA:
+        if not _VALID_SCHEMA.match(_APP_SCHEMA):
+            raise RuntimeError(f"invalid APP_SCHEMA: {_APP_SCHEMA!r}")
+        with conn.cursor() as cur:
+            cur.execute(f"set search_path to {_APP_SCHEMA}, public")
+        conn.commit()
+    return conn
 
 
 # ---- job queue ---------------------------------------------------------------

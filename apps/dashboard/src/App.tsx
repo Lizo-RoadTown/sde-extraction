@@ -10,6 +10,7 @@ import { cx } from "./ui";
 import { AuthGate } from "./auth";
 import { usePreview, setPreview } from "./usePreview";
 import { useRoute, matchVerify, Link } from "./router";
+import { PATHS, activeSchema, setActiveSchema } from "./lib/supabase";
 
 // Real routing (hash-based) so every view is a back-able URL. The work splits in two:
 // a Single-run page that does one paper end to end inline, and a Queue page for batches
@@ -95,6 +96,7 @@ export default function App() {
         <header className="flex h-13 items-center justify-between border-b border-edge px-6 py-3">
           <div className="text-sm text-ink-dim">{currentLabel(route)}</div>
           <div className="flex items-center gap-3 text-xs text-ink-dim">
+            <PathSelector />
             <a href={DOCS_URL} target="_blank" rel="noreferrer"
               className="rounded-full px-2 py-1 text-ink-faint transition hover:bg-surface-raised hover:text-ink">
               Documentation ↗
@@ -117,6 +119,26 @@ export default function App() {
       </div>
     </div>
     </AuthGate>
+  );
+}
+
+// Which extraction PATH this dashboard reads/writes. Each path is the same app over its own Postgres
+// schema (its own queue + results), drained by its own worker. Switching reloads against that schema.
+function PathSelector() {
+  const active = activeSchema();
+  return (
+    <label className="flex items-center gap-1.5" title="Which extraction path this dashboard reads and writes">
+      <span className="text-[11px] text-ink-faint">path</span>
+      <select
+        value={active}
+        onChange={(e) => setActiveSchema(e.target.value)}
+        className="rounded-full bg-surface-raised px-2 py-1 text-[11px] text-ink-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
+      >
+        {PATHS.map((p) => (
+          <option key={p.schema} value={p.schema}>{p.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
