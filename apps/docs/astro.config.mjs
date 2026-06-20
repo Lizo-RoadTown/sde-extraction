@@ -40,6 +40,7 @@ export default defineConfig({
           label: "How it works",
           items: [
             { label: "What it recognizes", slug: "explanation/recognizes" },
+            { label: "Parameters", slug: "explanation/parameters" },
             { label: "Where each value comes from", slug: "explanation/provenance" },
             { label: "The structured map", slug: "reference/schema" },
           ],
@@ -48,12 +49,33 @@ export default defineConfig({
           label: "Watch it work",
           items: [
             { label: "Watch it work", slug: "explanation/observability" },
+            { label: "How sure it is", slug: "explanation/confidence" },
+            { label: "How it earns its confidence", slug: "explanation/agent-health" },
+            { label: "Where the data flows", slug: "explanation/extraction-health" },
           ],
         },
         {
           label: "Use it",
           items: [
             { label: "Add a paper and check it", slug: "how-to/add-and-verify" },
+            { label: "Get the data (public API)", slug: "how-to/public-api" },
+          ],
+        },
+        // Developer documentation — for building/changing the system, not using it. Collapsed and
+        // badged so it stays clearly separate from the scientist-facing content above. Grows as pages
+        // are written (architecture, decisions, contributing); each added when it is real.
+        {
+          label: "Developer documentation",
+          collapsed: true,
+          badge: { text: "Dev", variant: "note" },
+          items: [
+            { label: "Overview", slug: "dev" },
+            {
+              label: "Logic & decisions",
+              items: [
+                { label: "Triaging failures across the boundary", slug: "dev/operations/failure-triage" },
+              ],
+            },
           ],
         },
       ],
