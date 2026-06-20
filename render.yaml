@@ -12,8 +12,10 @@ services:
   # TEST BRANCH worker — the SAME extraction worker as main, but with EXTRACTION_ENGINE=dagster, so it
   # runs each job through the Dagster-orchestrated pipeline (dagster_flow.run_via_dagster) instead of
   # processor.run directly. Identical app + result; only the orchestration differs (the PI's compare).
-  # Named distinctly so it runs ALONGSIDE main's sde-extraction-worker. (Both drain the same Supabase
-  # queue — for a clean side-by-side, run one at a time, or we add engine-affinity to claim_next_job.)
+  # Named distinctly so it runs ALONGSIDE main's sde-extraction-worker. Because APP_SCHEMA=dagster_app
+  # sets the search_path, this worker drains dagster_app.extraction_jobs while main drains
+  # public.extraction_jobs — SEPARATE queues, no contention, both can run at once. A job reaches THIS
+  # worker only when it's enqueued on the dashboard's Dagster path (which writes to dagster_app).
   - name: sde-extraction-worker-dagster
     type: worker
     runtime: docker
