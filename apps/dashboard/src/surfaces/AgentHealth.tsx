@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, SectionTitle, Badge, cx } from "../ui";
 import { loadAgentHealth, type AgentHealth as Vitals } from "../data";
+import { activePath } from "../lib/supabase";
 
 // Agent Health — the real stages of the pipeline and how healthy each is. The point is to show which
 // steps are DETERMINISTIC (no LLM) and which is the one LLM step, plus the back-propagated human verdict
@@ -55,12 +56,24 @@ function layersFor(key: string, v: Vitals): { label: string; value: string; live
 export function AgentHealth() {
   const [v, setV] = useState<Vitals>({ processed: 0, succeeded: 0, failed: 0, inFlight: 0, needsHuman: 0, verified: 0 });
   useEffect(() => { loadAgentHealth().then(setV); }, []);
+  const path = activePath();
+  const isDagster = path.schema === "dagster_app";
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <SectionTitle hint="Each agent that operates a validation gate, and how healthy it is. Agent health is how confidence is earned — the back-propagated human verdict (V8), tagged by model/figure type, raises or lowers an extractor's trust.">
+      <SectionTitle hint="Each part of the pipeline and how healthy it is. Confidence is earned — the human verdict, tagged by kind, raises or lowers a part's trust.">
         Agent Health
       </SectionTitle>
+
+      {/* Which path these vitals are for — each path runs over its own schema. On the Dagster path the
+          stages run as an orchestrated, retriable Dagster job; on the direct path as a single call. */}
+      <div className="rounded-md border border-edge bg-inset px-3 py-2 text-[11px] text-ink-dim">
+        <span className="text-ink-faint">path </span>
+        <span className="mono text-ink">{path.label}</span>
+        <span className="text-ink-faint"> · {isDagster
+          ? "Dagster orchestrates these stages as ordered, retriable, observable steps (a failed step retries on its own; the others' outputs are kept)"
+          : "a single OpenAI/Pydantic call — the stages are not independently orchestrated or retriable"}</span>
+      </div>
 
       <div className="flex flex-col gap-4">
         {AGENTS.map((a) => (
