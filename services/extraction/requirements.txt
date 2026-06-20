@@ -6,3 +6,8 @@ supabase>=2.0.0
 pdfplumber>=0.11.0
 PyMuPDF>=1.24.0
 numpy>=1.26.0
+# Dagster engine (test branch only): the worker runs the SAME pipeline through Dagster when
+# EXTRACTION_ENGINE=dagster. main leaves it unset and never imports/needs this. (diffrax/jax are
+# only pulled when the reproduction oracle actually runs — a future executable-model path — so the
+# worker image stays lean for now.)
+dagster>=1.13

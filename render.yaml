@@ -9,7 +9,12 @@
 # Secrets (OPENAI_API_KEY, DATABASE_URL, SUPABASE_*) are NOT committed — set them in the
 # Render dashboard (sync:false marks them as dashboard-managed).
 services:
-  - name: sde-extraction-worker
+  # TEST BRANCH worker — the SAME extraction worker as main, but with EXTRACTION_ENGINE=dagster, so it
+  # runs each job through the Dagster-orchestrated pipeline (dagster_flow.run_via_dagster) instead of
+  # processor.run directly. Identical app + result; only the orchestration differs (the PI's compare).
+  # Named distinctly so it runs ALONGSIDE main's sde-extraction-worker. (Both drain the same Supabase
+  # queue — for a clean side-by-side, run one at a time, or we add engine-affinity to claim_next_job.)
+  - name: sde-extraction-worker-dagster
     type: worker
     runtime: docker
     rootDir: ./services/extraction
@@ -23,6 +28,8 @@ services:
         value: "30"
       - key: OPENAI_MODEL
         value: gpt-4o-2024-08-06
+      - key: EXTRACTION_ENGINE
+        value: dagster
       - key: OPENAI_API_KEY
         sync: false
       - key: DATABASE_URL

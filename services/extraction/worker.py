@@ -108,12 +108,15 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
     job_id = str(job["id"])
     figure_label = job.get("figure_label") or ""
     target = job.get("target") or {"mode": "auto"}
+    # Engine: which pipeline runs this job. "direct" = processor.run (main, as we have it);
+    # "dagster" = the SAME pipeline run through Dagster (the test branch sets EXTRACTION_ENGINE=dagster).
+    # Identical app, identical result — only the orchestration differs. That is the PI's comparison.
+    engine = (target or {}).get("engine") or os.environ.get("EXTRACTION_ENGINE", "direct")
     # The intake path — stamped on every seam hook so observability decomposes by WHERE the
-    # data came in (lane) and HOW it was targeted (mode) and its origin (source: upload today,
-    # 'doi' once DOI fetch lands). target.source defaults to 'upload', the only live intake.
+    # data came in (lane) and HOW it was targeted (mode) and its origin (source) and which engine ran it.
     intake = {"lane": target.get("lane"), "mode": target.get("mode"),
-              "source": target.get("source") or "upload"}
-    print(f"job {job_id}: extracting (figure={figure_label!r}, mode={target.get('mode')})")
+              "source": target.get("source") or "upload", "engine": engine}
+    print(f"job {job_id}: extracting (figure={figure_label!r}, mode={target.get('mode')}, engine={engine})")
     try:
         paper = db.get_paper(conn, str(job["paper_id"])) or {}
         if (target or {}).get("mode") == "detect":
@@ -123,9 +126,23 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
         pdf_url = _signed_pdf_url(paper, dry_run)
 
         _t0 = time.monotonic()
-        result = processor.run(
-            pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
-        )
+        if engine == "dagster":
+            try:
+                import dagster_flow  # imported only on the dagster path; main never needs dagster
+                result = dagster_flow.run_via_dagster(
+                    pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
+                )
+            except Exception as e:  # noqa: BLE001 — dagster missing/errored: fall back, never drop the job
+                print(f"  dagster engine unavailable ({e}); falling back to direct")
+                engine = "direct"
+                intake["engine"] = "direct"
+                result = processor.run(
+                    pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
+                )
+        else:
+            result = processor.run(
+                pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
+            )
         extract_ms = int((time.monotonic() - _t0) * 1000)  # the speed dimension for S3
 
         db.update_job(conn, job_id, stage="machine_verify", progress=0.8)
