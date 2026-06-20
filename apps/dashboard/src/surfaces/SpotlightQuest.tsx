@@ -48,9 +48,6 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 const center = (r: Rect): Pt => ({ x: (r.x + r.w / 2) * 100, y: (r.y + r.h / 2) * 100 });
-// a scanning point when we DON'T have a real position yet (locator not run) — keeps the lens
-// alive/searching without claiming precision; the precise highlight box only draws when located.
-const scatter = (i: number): Pt => ({ x: 22 + ((i * 37) % 56), y: 18 + ((i * 53) % 58) });
 const metallic: CSSProperties = {
   backgroundImage: "linear-gradient(hsl(0 0% 96%), hsl(0 0% 55%))",
   WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
@@ -118,7 +115,10 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
     if (!f) { setDone(true); return; }
     setPage(f.page);
     setRevealed(false);
-    target.current = f.rect ? center(f.rect) : scatter(step); // land if located, else scan
+    // Land the lens ONLY when we have a real located rect. If the locator couldn't pinpoint this
+    // value, we do NOT move the lens to a fake spot — the spotlight is hidden for that step and the
+    // value is shown honestly in the panel as "position not found". (No more scatter to random places.)
+    if (f.rect) target.current = center(f.rect);
     const t1 = window.setTimeout(() => setRevealed(true), f.rect ? 800 : 450);
     const t2 = window.setTimeout(() => { if (step + 1 >= finds.length) setDone(true); else setStep(step + 1); }, 1900);
     return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
@@ -152,8 +152,12 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
   }
 
   const found = Math.min(step + (revealed ? 1 : 0), finds.length);
+  const located = !!cur?.rect;             // do we have a real position for the current value?
   const caption = done ? "search complete"
-    : cur ? (revealed ? `✦ ${cur.human} located` : `searching p.${page} for ${cur.human}…`) : `p.${page}`;
+    : cur ? (revealed
+        ? (located ? `✦ ${cur.human} located on p.${page}` : `${cur.human} — position not found on p.${page}`)
+        : `searching p.${page} for ${cur.human}…`)
+      : `p.${page}`;
   const gotIdx = (i: number) => done || i < step || (i === step && revealed);
 
   return (
@@ -164,7 +168,8 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
           <Document file={src} loading={<div className="flex h-96 items-center justify-center text-xs text-ink-faint">loading PDF…</div>}>
             <Page pageNumber={page} width={WIDTH} renderTextLayer={false} renderAnnotationLayer={false}
               loading={<div className="flex h-96 items-center justify-center text-xs text-ink-faint">rendering p.{page}…</div>} />
-            {!done && (
+            {/* spotlight only when we have a real position — never darken-and-focus a fake spot */}
+            {!done && located && (
               <div ref={overlayRef} className="pointer-events-none absolute inset-0"
                 style={{ filter: "blur(5px) brightness(0.4)", maskImage: maskFor(spot.current), WebkitMaskImage: maskFor(spot.current), willChange: "mask" }}>
                 <Page pageNumber={page} width={WIDTH} renderTextLayer={false} renderAnnotationLayer={false} loading={<div className="h-96" />} />
@@ -177,8 +182,8 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
             <div className="pointer-events-none absolute z-10 rounded-sm border border-active/80 bg-active/15"
               style={{ left: `${cur.rect.x * 100}%`, top: `${cur.rect.y * 100}%`, width: `${cur.rect.w * 100}%`, height: `${cur.rect.h * 100}%` }} />
           )}
-          {/* the magnifier lens ring */}
-          {!done && (
+          {/* the magnifier lens ring — shown only while honing in on a real position */}
+          {!done && located && (
             <div ref={lensRef} className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-active/50"
               style={{ left: "50%", top: "40%", height: R * 2, width: R * 2, boxShadow: "0 0 46px hsl(200 100% 60% / 0.22), inset 0 0 34px hsl(200 100% 60% / 0.10)" }} />
           )}
@@ -207,7 +212,10 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
                   got ? "opacity-100" : "opacity-45")}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-[11px] text-ink-dim" title={f.human}>{f.human}</span>
-                    <span className="shrink-0 text-[10px] text-ink-faint">p.{f.page}{f.rect ? "" : " ·?"}</span>
+                    <span className={cx("shrink-0 text-[10px]", f.rect ? "text-ink-faint" : "text-attention")}
+                      title={f.rect ? "located on the page" : "value captured, but its position on the page couldn't be pinpointed"}>
+                      p.{f.page}{f.rect ? "" : " · no position"}
+                    </span>
                   </div>
                   <div className="truncate text-xs text-ink" title={f.value}>{f.value}</div>
                   <div className={cx("mono truncate text-[11px] transition-all duration-500", got ? "blur-0" : "blur-[4px]")} style={metallic}>
@@ -251,7 +259,8 @@ export function SpotlightQuest({ ext }: { ext: FigureExtraction }) {
 
       <p className="text-[11px] text-ink-faint">
         A searchlight replay over the real PDF — the lens lands only where the locator found the quote (real position →
-        real hash); a <span className="mono">·?</span> means that value couldn’t be pinpointed (shown here, never faked on the page).
+        real hash). Values marked <span className="text-attention">· no position</span> were captured but couldn’t be
+        pinpointed on the page; they’re shown here honestly, never faked with a highlight.
       </p>
     </div>
   );
