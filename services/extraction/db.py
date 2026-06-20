@@ -151,6 +151,35 @@ def record_validation_event(
         conn.commit()
 
 
+def write_orchestration_run(
+    conn: psycopg.Connection,
+    *,
+    run_id: Optional[str],
+    job_id: Optional[str],
+    paper_id: Optional[str],
+    engine: str,
+    status: str,
+    duration_ms: Optional[int],
+    event_count: Optional[int],
+    steps: Optional[dict[str, Any]],
+    events: Optional[list[dict[str, Any]]],
+) -> None:
+    """Persist ONE captured orchestration run (the full Dagster run: id, status, timing, per-step
+    rollup, every event) into OUR orchestration_runs table, for our own observability surface. Writes
+    to the worker's schema via search_path. Best-effort — a telemetry write must never break the job."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into orchestration_runs
+                (run_id, job_id, paper_id, engine, status, duration_ms, event_count, steps, events)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (run_id, job_id, paper_id, engine, status, duration_ms, event_count,
+             json.dumps(steps or {}), json.dumps(events or [])),
+        )
+        conn.commit()
+
+
 def write_extraction(
     conn: psycopg.Connection,
     *,

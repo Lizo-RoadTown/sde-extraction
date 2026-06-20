@@ -461,3 +461,42 @@ export async function loadAgentHealth(): Promise<AgentHealth> {
   const [needsHuman, verified] = await Promise.all([statusCount("needs_human"), statusCount("verified")]);
   return { processed: succeeded + failed, succeeded, failed, inFlight, needsHuman, verified };
 }
+
+// ---- orchestration runs (our OWN capture of the full Dagster run) -------------
+// Every run on the Dagster path records its complete event stream + per-step rollup into
+// orchestration_runs (services/extraction/dagster_flow.py + worker.py). This is our own
+// observability surface — never Dagster's UI. The direct path records nothing (no orchestration),
+// so this is empty there — which is itself the visible with/without difference.
+export interface OrchestrationStep {
+  op: string;
+  status: string;          // success | failed | retrying | skipped | running
+  events: string[];
+}
+export interface OrchestrationEvent {
+  type: string;            // PIPELINE_START | STEP_START | STEP_SUCCESS | ...
+  step: string | null;
+  message?: string;
+}
+export interface OrchestrationRun {
+  id: string;
+  run_id: string | null;
+  job_id: string | null;
+  engine: string | null;
+  status: string | null;   // success | failed
+  duration_ms: number | null;
+  event_count: number | null;
+  steps: Record<string, OrchestrationStep> | null;
+  events: OrchestrationEvent[] | null;
+  created_at: string;
+}
+
+export async function loadOrchestrationRuns(limit = 25): Promise<OrchestrationRun[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("orchestration_runs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) { console.error("loadOrchestrationRuns:", error.message); return []; }
+  return (data as OrchestrationRun[]) ?? [];
+}

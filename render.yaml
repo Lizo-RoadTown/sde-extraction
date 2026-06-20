@@ -30,6 +30,8 @@ services:
         value: gpt-4o-2024-08-06
       - key: EXTRACTION_ENGINE
         value: dagster
+      - key: APP_SCHEMA
+        value: dagster_app
       - key: OPENAI_API_KEY
         sync: false
       - key: DATABASE_URL

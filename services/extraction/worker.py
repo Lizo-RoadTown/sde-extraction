@@ -192,6 +192,21 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
                    job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="storage",
                    lineage_ref=ext_id, tags={**intake, "status": "needs_human"})
         print(f"job {job_id}: stored extraction {ext_id} (needs_human)")
+        # Capture the FULL orchestration run (Dagster path only) into OUR store — the observability is
+        # the whole point. Best-effort: never let a telemetry write fail the job.
+        orch = result.get("orchestration") if engine == "dagster" else None
+        if orch:
+            try:
+                db.write_orchestration_run(
+                    conn, run_id=orch.get("run_id"), job_id=job_id, paper_id=pid, engine=engine,
+                    status="success" if orch.get("success") else "failed",
+                    duration_ms=orch.get("duration_ms"), event_count=orch.get("event_count"),
+                    steps=orch.get("steps"), events=orch.get("events"),
+                )
+                print(f"job {job_id}: captured orchestration run {orch.get('run_id')} "
+                      f"({orch.get('event_count')} events)")
+            except Exception as e:  # noqa: BLE001 — capture must never break the job
+                print(f"  orchestration capture write failed: {e}")
     except Exception as e:  # noqa: BLE001 — one bad job shouldn't stop the worker
         print(f"job {job_id}: FAILED — {e}")
         db.update_job(conn, job_id, stage="failed", error=str(e))

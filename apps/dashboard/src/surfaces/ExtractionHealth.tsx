@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import { SectionTitle, cx } from "../ui";
 import { SeamMap } from "./SeamMap";
+import { OrchestrationRuns } from "./OrchestrationRuns";
 import { activePath } from "../lib/supabase";
 
 // Extraction Health = observability, and observability shows ONLY real telemetry. No fabricated
@@ -60,6 +61,10 @@ export function ExtractionHealth() {
           </Suspense>
         )}
       </div>
+
+      {/* Our own capture of the full orchestration — every Dagster run, every event. The seam map above
+          is the aggregate flow; this is the per-run record. On the direct path this is empty by design. */}
+      <OrchestrationRuns />
     </div>
   );
 }
