@@ -150,8 +150,24 @@ def run_flow_v2(figure_read: FigureRead, agent: Agent = AGENT) -> dict[str, Any]
         "staged": staged,
         "crosscheck": summary,
         "gate_log": {s.symbol: [r.__dict__ for r in s.gate_log] for s in states},
-        "agent_wired": agent is not AGENT or agent.detect is not _stub_detect,
+        "agent_wired": agent.detect is not _stub_detect,
     }
+
+
+def run_from_pdf(
+    *, pdf_url: Optional[str], figure_label: str,
+    region: Optional[dict[str, Any]] = None, no_llm: bool = False, agent: Agent = AGENT,
+) -> dict[str, Any]:
+    """Entry point: GATE 0 reads the figure (LLM) → the deterministic gated flow runs over its
+    variable checklist. Lazy-imports the agent so importing flow_v2 stays LLM-free. no_llm=True runs
+    the whole spine on stubs (no spend)."""
+    from agents_v2 import read_figure  # lazy: keeps flow_v2 import clean of the LLM
+
+    figure_read = read_figure(pdf_url=pdf_url, figure_label=figure_label, region=region, no_llm=no_llm)
+    out = run_flow_v2(figure_read, agent)
+    out["figure_read"] = figure_read
+    out["figure_read_wired"] = bool(pdf_url) and not no_llm
+    return out
 
 
 # ---- Dagster engine wrapper (optional; imported lazily on the dagster path) ---------------------
