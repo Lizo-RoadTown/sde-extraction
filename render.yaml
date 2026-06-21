@@ -9,13 +9,38 @@
 # Secrets (OPENAI_API_KEY, DATABASE_URL, SUPABASE_*) are NOT committed — set them in the
 # Render dashboard (sync:false marks them as dashboard-managed).
 services:
-  # TEST BRANCH worker — the SAME extraction worker as main, but with EXTRACTION_ENGINE=dagster, so it
-  # runs each job through the Dagster-orchestrated pipeline (dagster_flow.run_via_dagster) instead of
-  # processor.run directly. Identical app + result; only the orchestration differs (the PI's compare).
-  # Named distinctly so it runs ALONGSIDE main's sde-extraction-worker. Because APP_SCHEMA=dagster_app
-  # sets the search_path, this worker drains dagster_app.extraction_jobs while main drains
-  # public.extraction_jobs — SEPARATE queues, no contention, both can run at once. A job reaches THIS
-  # worker only when it's enqueued on the dashboard's Dagster path (which writes to dagster_app).
+  # PRODUCTION worker — the direct path: processor.run on the public schema (no APP_SCHEMA,
+  # EXTRACTION_ENGINE defaults to "direct"). Drains public.extraction_jobs. This is the worker the
+  # OpenAI/Pydantic path uses; it must stay declared so the production extraction path keeps running.
+  - name: sde-extraction-worker
+    type: worker
+    runtime: docker
+    rootDir: ./services/extraction
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/extraction
+    autoDeploy: true
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: POLL_INTERVAL
+        value: "30"
+      - key: OPENAI_MODEL
+        value: gpt-4o-2024-08-06
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+  # DAGSTER-PATH worker — the SAME extraction worker, but EXTRACTION_ENGINE=dagster runs each job
+  # through the Dagster-orchestrated pipeline (dagster_flow.run_via_dagster) instead of processor.run.
+  # Identical app + result; only the orchestration differs (the PI's compare). Because APP_SCHEMA=
+  # dagster_app sets the search_path, it drains dagster_app.extraction_jobs while the worker above
+  # drains public.extraction_jobs — SEPARATE queues, no contention, both run at once. A job reaches
+  # this worker only when enqueued on the dashboard's Dagster path (which writes to dagster_app).
   - name: sde-extraction-worker-dagster
     type: worker
     runtime: docker
