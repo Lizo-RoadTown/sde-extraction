@@ -43,6 +43,7 @@ export default defineConfig({
             { label: "Parameters", slug: "explanation/parameters" },
             { label: "Where each value comes from", slug: "explanation/provenance" },
             { label: "The magnifying glass", slug: "explanation/magnifying-glass" },
+            { label: "The two run paths", slug: "explanation/run-paths" },
             { label: "The structured map", slug: "reference/schema" },
           ],
         },
