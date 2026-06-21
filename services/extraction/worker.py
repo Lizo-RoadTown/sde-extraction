@@ -218,6 +218,18 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
         hooks.emit(conn, point="store", subject_kind="script", outcome="pass",
                    job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="storage",
                    lineage_ref=ext_id, tags={**intake, "status": "needs_human"})
+        # Per-gate seams (flow_v2): one validation_event per variable per gate — the gated flow made
+        # observable (recorded-transformation rule 5). subject = the variable; lineage = the stored
+        # extraction; every gate wraps back to the figure (tag). No-op on non-flow_v2 engines.
+        for _sym, _gates in ((result.get("flow_v2") or {}).get("gate_log") or {}).items():
+            for _g in _gates:
+                _v = _g.get("verdict")
+                hooks.emit(conn, point=f"gate:{_g.get('gate')}", subject_kind="agent",
+                           outcome={"agree": "pass", "disagree": "fail"}.get(_v, "flag"),
+                           job_id=job_id, paper_id=pid, thread_id=job_id,
+                           subject_id=f"var:{_sym}", lineage_ref=ext_id,
+                           tags={**intake, "gate": _g.get("gate"), "verdict": _v, "figure": figure,
+                                 "wired": (_g.get("detection") or {}).get("wired", False)})
         print(f"job {job_id}: stored extraction {ext_id} (needs_human)")
         # Capture the FULL orchestration run (Dagster path only) into OUR store — the observability is
         # the whole point. Best-effort: never let a telemetry write fail the job.
