@@ -139,6 +139,31 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
                 result = processor.run(
                     pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
                 )
+        elif engine == "flow_v2":
+            # The gated, figure-anchored, per-variable flow (read_figure → per-variable gates →
+            # deterministic assemble). Adapt its output to the worker's result shape.
+            try:
+                import flow_v2
+                from schema import checksums_for
+                fv = flow_v2.run_from_pdf(
+                    pdf_url=pdf_url, figure_label=figure_label,
+                    region=(target or {}).get("region"), no_llm=dry_run,
+                )
+                staged = fv["staged"]
+                result = {
+                    "model": staged.model.model_dump(),
+                    "checksums": checksums_for(staged.model),
+                    # the gated-flow audit, stored with the extraction so the gates are observable
+                    "flow_v2": {"crosscheck": fv["crosscheck"], "gate_log": fv["gate_log"],
+                                "figure_read_wired": fv["figure_read_wired"]},
+                }
+            except Exception as e:  # noqa: BLE001 — flow_v2 missing/errored: fall back, never drop the job
+                print(f"  flow_v2 engine unavailable ({e}); falling back to direct")
+                engine = "direct"
+                intake["engine"] = "direct"
+                result = processor.run(
+                    pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
+                )
         else:
             result = processor.run(
                 pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
@@ -150,6 +175,8 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
         fig_prov = result.get("figure_provenance")
         if fig_prov:
             model["_figure_provenance"] = fig_prov  # which figure was isolated: page/bbox/tool/dual SHA
+        if result.get("flow_v2"):
+            model["_flow_v2"] = result["flow_v2"]  # gated-flow audit (crosscheck + per-variable gate log)
         pid = str(job["paper_id"])
         # Hooks (best-effort telemetry → validation_events): the extract + locate stages.
         locs = result.get("locations") or {}
