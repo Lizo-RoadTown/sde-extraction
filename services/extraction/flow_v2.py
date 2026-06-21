@@ -156,14 +156,16 @@ def run_flow_v2(figure_read: FigureRead, agent: Agent = AGENT) -> dict[str, Any]
 
 def run_from_pdf(
     *, pdf_url: Optional[str], figure_label: str,
-    region: Optional[dict[str, Any]] = None, no_llm: bool = False, agent: Agent = AGENT,
+    region: Optional[dict[str, Any]] = None, no_llm: bool = False, agent: Optional[Agent] = None,
 ) -> dict[str, Any]:
-    """Entry point: GATE 0 reads the figure (LLM) → the deterministic gated flow runs over its
-    variable checklist. Lazy-imports the agent so importing flow_v2 stays LLM-free. no_llm=True runs
-    the whole spine on stubs (no spend)."""
-    from agents_v2 import read_figure  # lazy: keeps flow_v2 import clean of the LLM
+    """Entry point: GATE 0 reads the figure (LLM) → per-variable agents walk the gates → deterministic
+    assembly. Lazy-imports agents_v2 so importing flow_v2 stays LLM-free. no_llm=True runs the whole
+    spine on stubs (no spend). Pass `agent` to override (e.g. in tests)."""
+    from agents_v2 import make_agent, read_figure  # lazy: keeps flow_v2 import clean of the LLM
 
     figure_read = read_figure(pdf_url=pdf_url, figure_label=figure_label, region=region, no_llm=no_llm)
+    if agent is None:
+        agent = make_agent(pdf_url=pdf_url, region=region, no_llm=no_llm)
     out = run_flow_v2(figure_read, agent)
     out["figure_read"] = figure_read
     out["figure_read_wired"] = bool(pdf_url) and not no_llm

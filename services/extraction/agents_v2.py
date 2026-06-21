@@ -14,7 +14,7 @@ import os
 from typing import Any, Optional
 
 from assemble import absent_slot
-from schema import FigureRead, TimeSpan
+from schema import FigureRead, TimeSpan, VariableExtraction
 
 
 READ_FIGURE_SYSTEM = """You read ONE figure from a stochastic-differential-equation (SDE) epidemiological paper.
@@ -83,3 +83,108 @@ def read_figure(
             os.remove(pdf_path)
         except OSError:
             pass
+
+
+# ---- gate 1: terms — the per-variable agent (one per variable, scoped to its equation) ----------
+
+EXTRACT_VARIABLE_SYSTEM = """You extract ONE state variable's stochastic equation from an SDE epidemiological paper.
+
+For the given variable, find ITS equation in the paper (the one feeding the chosen figure) and return,
+VERBATIM as written (with the exact source quote and page), present/absent each:
+- meaning: what the variable represents
+- initial_value: its initial condition
+- drift: the deterministic right-hand side (the dt part of d{var} = (...)dt + (...)dW)
+- diffusion: the stochastic/noise right-hand side (the dW part)
+- parameters: the constants appearing in THIS variable's equation only (each with value/meaning/units,
+  present/absent). Shared constants are reconciled across variables later by a script — just grab the
+  ones in this equation.
+
+Rules: transcribe exactly, never evaluate or simplify; if something is not stated, mark it absent with a
+reason; never guess. This is ONE variable, scoped to its own equation."""
+
+
+def _stub_variable(symbol: str) -> VariableExtraction:
+    return VariableExtraction(
+        symbol=symbol, meaning=absent_slot(), initial_value=absent_slot(),
+        drift=absent_slot(), diffusion=absent_slot(), parameters=[],
+    )
+
+
+def extract_variable(
+    *, symbol: str, figure_read: FigureRead, pdf_url: Optional[str],
+    region: Optional[dict[str, Any]] = None, no_llm: bool = False,
+) -> VariableExtraction:
+    """Gate 1 (per variable): the variable's own agent reads ITS equation for this figure and returns a
+    VariableExtraction (drift, diffusion, meaning, initial_value, + the params in its equation). Same
+    OpenAI+Pydantic brain as read_figure. Returns a stub on no_llm / no PDF (deterministic spine runs)."""
+    if no_llm or not pdf_url:
+        return _stub_variable(symbol)
+
+    from openai import OpenAI  # lazy
+
+    from processor import MODEL, _download
+
+    client = OpenAI()
+    pdf_path = _download(pdf_url)
+    try:
+        with open(pdf_path, "rb") as f:
+            uploaded = client.files.create(file=f, purpose="user_data")
+        instruction = (
+            f"The figure is '{figure_read.figure_label}' (pathogen: {figure_read.pathogen or 'n/a'}). "
+            f"Extract the stochastic equation for the variable '{symbol}' only, into the schema."
+        )
+        resp = client.responses.parse(
+            model=MODEL,
+            input=[{"role": "system", "content": EXTRACT_VARIABLE_SYSTEM},
+                   {"role": "user", "content": [
+                       {"type": "input_file", "file_id": uploaded.id},
+                       {"type": "input_text", "text": instruction},
+                   ]}],
+            text_format=VariableExtraction,
+        )
+        ve = resp.output_parsed
+        ve.symbol = symbol  # anchor to the checklist symbol, not whatever the model echoed
+        return ve
+    finally:
+        try:
+            os.remove(pdf_path)
+        except OSError:
+            pass
+
+
+# ---- the per-variable gate agent (real detect for `terms`; other gates stay honest stubs) -------
+
+def make_agent(*, pdf_url: Optional[str], region: Optional[dict[str, Any]] = None, no_llm: bool = False):
+    """Build the flow_v2.Agent whose detect/validate are wired for the gates we've implemented. Gate
+    `terms` runs the per-variable extractor; later gates return honest 'not wired' until built. The
+    per-variable thread is the VariableState the runner carries gate to gate."""
+    from flow_v2 import Agent  # lazy: flow_v2 never imports agents_v2 at module top, so no cycle
+
+    def _present(slot: Any) -> bool:
+        return getattr(slot, "status", None) == "present"
+
+    def detect(symbol, gate, figure_read, state) -> dict[str, Any]:
+        if gate.key == "terms":
+            ve = extract_variable(symbol=symbol, figure_read=figure_read, pdf_url=pdf_url,
+                                  region=region, no_llm=no_llm)
+            # write the extraction into the per-variable thread
+            state.meaning = ve.meaning
+            state.initial_value = ve.initial_value
+            state.drift = ve.drift
+            state.diffusion = ve.diffusion
+            state.parameters = ve.parameters
+            return {"wired": bool(pdf_url) and not no_llm, "gate": "terms",
+                    "drift_present": _present(ve.drift), "diffusion_present": _present(ve.diffusion),
+                    "n_params": len(ve.parameters)}
+        return {"wired": False, "gate": gate.key}  # noise_structure / form / parameters: not built yet
+
+    def validate(symbol, gate, state):
+        from contracts import SlotVerdict
+        if gate.key == "terms":
+            ok = _present(state.drift) or _present(state.diffusion)
+            return SlotVerdict(field_path=f"{symbol}:terms",
+                               verdict="agree" if ok else "uncertain",
+                               rationale="drift/diffusion captured" if ok else "no term captured")
+        return SlotVerdict(field_path=f"{symbol}:{gate.key}", verdict="uncertain", rationale="agent not wired")
+
+    return Agent(detect=detect, validate=validate)
