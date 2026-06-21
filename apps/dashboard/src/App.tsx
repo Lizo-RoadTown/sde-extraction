@@ -10,6 +10,9 @@ import { cx } from "./ui";
 import { AuthGate } from "./auth";
 import { usePreview, setPreview } from "./usePreview";
 import { useRoute, matchVerify, Link } from "./router";
+import { PATHS, activeSchema, setActiveSchema, supabaseConfigured } from "./lib/supabase";
+import { loadHeartbeat } from "./data";
+import { useEffect, useState } from "react";
 
 // Real routing (hash-based) so every view is a back-able URL. The work splits in two:
 // a Single-run page that does one paper end to end inline, and a Queue page for batches
@@ -95,6 +98,7 @@ export default function App() {
         <header className="flex h-13 items-center justify-between border-b border-edge px-6 py-3">
           <div className="text-sm text-ink-dim">{currentLabel(route)}</div>
           <div className="flex items-center gap-3 text-xs text-ink-dim">
+            <PathSelector />
             <a href={DOCS_URL} target="_blank" rel="noreferrer"
               className="rounded-full px-2 py-1 text-ink-faint transition hover:bg-surface-raised hover:text-ink">
               Documentation ↗
@@ -104,10 +108,7 @@ export default function App() {
               GitHub ↗
             </a>
             <PreviewToggle />
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-present" />
-              engine + loom: live
-            </span>
+            <Heartbeat />
             <span className="rounded-full bg-surface-raised px-2 py-1">Liz · lead</span>
           </div>
         </header>
@@ -117,6 +118,26 @@ export default function App() {
       </div>
     </div>
     </AuthGate>
+  );
+}
+
+// Which extraction PATH this dashboard reads/writes. Each path is the same app over its own Postgres
+// schema (its own queue + results), drained by its own worker. Switching reloads against that schema.
+function PathSelector() {
+  const active = activeSchema();
+  return (
+    <label className="flex items-center gap-1.5" title="Which extraction path this dashboard reads and writes">
+      <span className="text-[11px] text-ink-faint">path</span>
+      <select
+        value={active}
+        onChange={(e) => setActiveSchema(e.target.value)}
+        className="rounded-full bg-surface-raised px-2 py-1 text-[11px] text-ink-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-active"
+      >
+        {PATHS.map((p) => (
+          <option key={p.schema} value={p.schema}>{p.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -135,5 +156,42 @@ function PreviewToggle() {
     >
       preview {preview ? "on" : "off"}
     </button>
+  );
+}
+
+// Real telemetry heartbeat — reflects the actual latest validation_events timestamp, not a hardcoded
+// "live". Green only if there's been activity in the last 15 min; otherwise it honestly says how long
+// it's been quiet (or that there's no activity / no backend yet). Never asserts "live" without evidence.
+function relTime(iso: string): { label: string; recent: boolean } {
+  const then = new Date(iso).getTime();
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  const recent = mins < 15;
+  if (mins < 1) return { label: "just now", recent };
+  if (mins < 60) return { label: `${mins}m ago`, recent };
+  const h = Math.round(mins / 60);
+  if (h < 24) return { label: `${h}h ago`, recent };
+  return { label: `${Math.round(h / 24)}d ago`, recent };
+}
+
+function Heartbeat() {
+  const [last, setLast] = useState<string | null | undefined>(undefined); // undefined = loading
+  useEffect(() => {
+    let live = true;
+    loadHeartbeat().then((v) => { if (live) setLast(v); });
+    return () => { live = false; };
+  }, []);
+  if (!supabaseConfigured) {
+    return <span className="text-ink-faint" title="No backend configured (mock mode)">telemetry: mock</span>;
+  }
+  if (last === undefined) return <span className="text-ink-faint">telemetry: …</span>;
+  if (last === null) {
+    return <span className="text-ink-faint" title="No validation_events recorded yet">telemetry: no activity yet</span>;
+  }
+  const { label, recent } = relTime(last);
+  return (
+    <span className="flex items-center gap-1.5" title={`last telemetry event ${label} (validation_events)`}>
+      <span className={cx("h-2 w-2 rounded-full", recent ? "animate-pulse bg-present" : "bg-ink-faint")} />
+      telemetry · {label}
+    </span>
   );
 }

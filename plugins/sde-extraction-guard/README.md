@@ -4,6 +4,14 @@ A guard as a **plugin**, not a script you must remember to run.
 
 ## What it does
 
+- **Framing-clarification gate** — a `UserPromptSubmit` hook (`hooks/clarify-gate.mjs`) injects a gate
+  on every turn that forces the assistant, *before* it scaffolds/deploys/creates anything, to: restate
+  the request in the operator's own words; classify the artifact as `{new system | layer in existing
+  app | edit}` (smallest that fits); name the exact existing surface it attaches to and what the user
+  sees; and confirm. It exists to catch the recurring drift where a requested *layer/tool* gets upgraded
+  into a separate, standalone, deployed *system* (e.g. building a whole separate Dagster app instead of
+  layering Dagster into the existing dashboard). The operator should not have to phrase things perfectly
+  — this filters for the ambiguity and forces a clarify step.
 - **Schema guard hook** — after any edit to `services/extraction/*.py` or `scripts/check_schema.py`, a
   `PostToolUse` hook runs the existing schema guard (`scripts/check_schema.py`) automatically. If the
   guard fails (a bad import/name/contract — the class of bug that crash-looped the worker), it blocks

@@ -12,10 +12,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Optional
 
 import psycopg
 from psycopg.rows import dict_row
+
+# Which Postgres schema this worker operates in. Lets two workers run the SAME code over SEPARATE
+# data: the OpenAI/Pydantic (direct) path uses public (default); the Dagster + OpenAI/Pydantic path
+# sets APP_SCHEMA=dagster_app. Unqualified table names in this module resolve via the search_path we
+# set on connect, so no query needs to change.
+_APP_SCHEMA = os.environ.get("APP_SCHEMA", "").strip()
+_VALID_SCHEMA = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")  # guard: it's our own env, but stay strict
 
 
 def get_db_url() -> Optional[str]:
@@ -35,7 +43,14 @@ def connect() -> psycopg.Connection:
     url = get_db_url()
     if not url:
         raise RuntimeError("DATABASE_URL not set")
-    return psycopg.connect(url, row_factory=dict_row)
+    conn = psycopg.connect(url, row_factory=dict_row)
+    if _APP_SCHEMA:
+        if not _VALID_SCHEMA.match(_APP_SCHEMA):
+            raise RuntimeError(f"invalid APP_SCHEMA: {_APP_SCHEMA!r}")
+        with conn.cursor() as cur:
+            cur.execute(f"set search_path to {_APP_SCHEMA}, public")
+        conn.commit()
+    return conn
 
 
 # ---- job queue ---------------------------------------------------------------
@@ -132,6 +147,35 @@ def record_validation_event(
             """,
             (job_id, paper_id, thread_id, point, subject_kind, subject_id,
              outcome, latency_ms, lineage_ref, json.dumps(tags or {})),
+        )
+        conn.commit()
+
+
+def write_orchestration_run(
+    conn: psycopg.Connection,
+    *,
+    run_id: Optional[str],
+    job_id: Optional[str],
+    paper_id: Optional[str],
+    engine: str,
+    status: str,
+    duration_ms: Optional[int],
+    event_count: Optional[int],
+    steps: Optional[dict[str, Any]],
+    events: Optional[list[dict[str, Any]]],
+) -> None:
+    """Persist ONE captured orchestration run (the full Dagster run: id, status, timing, per-step
+    rollup, every event) into OUR orchestration_runs table, for our own observability surface. Writes
+    to the worker's schema via search_path. Best-effort — a telemetry write must never break the job."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into orchestration_runs
+                (run_id, job_id, paper_id, engine, status, duration_ms, event_count, steps, events)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (run_id, job_id, paper_id, engine, status, duration_ms, event_count,
+             json.dumps(steps or {}), json.dumps(events or [])),
         )
         conn.commit()
 

@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { SectionTitle, Badge, ConfidenceChip, cx } from "../ui";
+import { SectionTitle, Badge, CompletenessChip, cx } from "../ui";
 import { Card } from "../ui";
+import { loadEscalations, submitVerdict, slotCounts } from "../data";
 
-// Mock extractor-confidence for an item, deterministic from its id (stable across
-// renders). Structure-level: replaced by the engine's real per-dimension score later.
-function mockConfidence(id: string): number {
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 1000;
-  return 0.35 + (h / 1000) * 0.6; // 0.35–0.95
+// Real completeness fraction for an extraction (present / total required fields). Used to order the
+// inbox: least-complete first, so the extractions that captured the fewest fields get eyes first.
+// No fabrication — computed from the stored model.
+function completenessFrac(e: FigureExtraction): number {
+  const c = slotCounts(e);
+  return c.total ? c.present / c.total : 1;
 }
-import { loadEscalations, submitVerdict } from "../data";
 import { PdfPane } from "./PdfPane";
 import { FigurePane } from "./FigurePane";
 import { SpotlightQuest } from "./SpotlightQuest";
@@ -249,14 +249,14 @@ export function Verify() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
-      <SectionTitle hint="An escalation inbox — the verifying agent already cleared what's machine-provable and surfaces only what needs your eyes, with lineage, proof, and the PDF. Ordered lowest-confidence first, so the riskiest extractions get your eyes first.">
+      <SectionTitle hint="An escalation inbox — every extraction awaiting your verdict, with lineage, proof, and the PDF. Ordered least-complete first (fewest fields captured), so the sparsest extractions get your eyes first.">
         Verify
       </SectionTitle>
       <div className="flex gap-4">
-        {/* escalation inbox — sorted lowest extractor-confidence first (riskiest first) */}
+        {/* escalation inbox — ordered by real completeness (least-complete first) */}
         <div className="flex w-64 shrink-0 flex-col gap-2">
           {[...escalations]
-            .sort((a, b) => mockConfidence(a.id) - mockConfidence(b.id))
+            .sort((a, b) => completenessFrac(a) - completenessFrac(b))
             .map((e) => (
             <button type="button" key={e.id} onClick={() => setSelected(e.id)}
               className={cx("rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-active", e.id === selected ? "border-active-edge bg-active-soft" : "border-edge bg-surface-raised/40 hover:bg-surface-raised/70")}>
@@ -264,7 +264,7 @@ export function Verify() {
               <div className="truncate text-xs text-ink-faint">{e.figureType || e.pathogen} · {e.doi}</div>
               <div className="mt-1 flex items-center gap-1.5">
                 <Badge tone="amber">needs human</Badge>
-                <ConfidenceChip score={mockConfidence(e.id)} />
+                <CompletenessChip {...slotCounts(e)} />
               </div>
             </button>
           ))}

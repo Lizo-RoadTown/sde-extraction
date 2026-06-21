@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState } from "react";
 import { SectionTitle, cx } from "../ui";
 import { SeamMap } from "./SeamMap";
+import { OrchestrationRuns } from "./OrchestrationRuns";
+import { activePath } from "../lib/supabase";
 
 // Extraction Health = observability, and observability shows ONLY real telemetry. No fabricated
 // "sample" gauges/confidence/self-update (they read as real and mislead — Liz, 2026-06-14), and
@@ -13,11 +15,25 @@ const SeamMap3D = lazy(() => import("./SeamMap3D").then((m) => ({ default: m.Sea
 
 export function ExtractionHealth() {
   const [view, setView] = useState<"2d" | "3d">("2d");
+  const path = activePath();
+  const isDagster = path.schema === "dagster_app";
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <SectionTitle hint="Where the data rests (drawers) and every place it transfers (seams). We watch at the seams — governance attaches where the data moves. Everything here is real validation_events; nothing is sampled.">
         Extraction Health
       </SectionTitle>
+
+      {/* Which path's telemetry this is — the two paths write SEPARATE schemas, so the seam map below
+          is this path's runs only. On the Dagster path the same seams are produced by an orchestrated,
+          retriable, ordered Dagster job (detect → extract → reproduce → store); on the direct path by
+          a single OpenAI/Pydantic call. */}
+      <div className="rounded-md border border-edge bg-inset px-3 py-2 text-[11px] text-ink-dim">
+        <span className="text-ink-faint">path </span>
+        <span className="mono text-ink">{path.label}</span>
+        <span className="text-ink-faint"> · {isDagster
+          ? "stages run as an orchestrated, retriable Dagster job — each seam below is one observable step"
+          : "a single OpenAI/Pydantic call — no workflow orchestration around the seams"}</span>
+      </div>
 
       {/* the seam map — 2D is the precise view (exact counts/latency); 3D is the gestalt of data
           flowing through the system (depth). Both from the same validation_events. */}
@@ -45,6 +61,10 @@ export function ExtractionHealth() {
           </Suspense>
         )}
       </div>
+
+      {/* Our own capture of the full orchestration — every Dagster run, every event. The seam map above
+          is the aggregate flow; this is the per-run record. On the direct path this is empty by design. */}
+      <OrchestrationRuns />
     </div>
   );
 }

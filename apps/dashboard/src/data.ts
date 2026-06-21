@@ -461,3 +461,75 @@ export async function loadAgentHealth(): Promise<AgentHealth> {
   const [needsHuman, verified] = await Promise.all([statusCount("needs_human"), statusCount("verified")]);
   return { processed: succeeded + failed, succeeded, failed, inFlight, needsHuman, verified };
 }
+
+// ---- orchestration runs (our OWN capture of the full Dagster run) -------------
+// Every run on the Dagster path records its complete event stream + per-step rollup into
+// orchestration_runs (services/extraction/dagster_flow.py + worker.py). This is our own
+// observability surface — never Dagster's UI. The direct path records nothing (no orchestration),
+// so this is empty there — which is itself the visible with/without difference.
+export interface OrchestrationStep {
+  op: string;
+  status: string;          // success | failed | retrying | skipped | running
+  events: string[];
+}
+export interface OrchestrationEvent {
+  type: string;            // PIPELINE_START | STEP_START | STEP_SUCCESS | ...
+  step: string | null;
+  message?: string;
+}
+export interface OrchestrationRun {
+  id: string;
+  run_id: string | null;
+  job_id: string | null;
+  engine: string | null;
+  status: string | null;   // success | failed
+  duration_ms: number | null;
+  event_count: number | null;
+  steps: Record<string, OrchestrationStep> | null;
+  events: OrchestrationEvent[] | null;
+  created_at: string;
+}
+
+export async function loadOrchestrationRuns(limit = 25): Promise<OrchestrationRun[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("orchestration_runs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) { console.error("loadOrchestrationRuns:", error.message); return []; }
+  return (data as OrchestrationRun[]) ?? [];
+}
+
+// ---- real, computed extraction completeness (replaces the old fake confidence) ----------------
+// A genuine signal derived from the extraction itself: how many of the figure's required fields came
+// back present vs absent, and how many present ones the locator pinned on the page. No fabrication —
+// every count is read from the stored model. This is NOT "earned confidence" (that needs human-verdict
+// telemetry, not built yet); it is honest extraction completeness.
+export interface SlotCounts { present: number; absent: number; total: number; located: number; }
+
+export function slotCounts(ext: FigureExtraction): SlotCounts {
+  let present = 0, absent = 0, located = 0;
+  const visit = (s: Slot) => {
+    if (s.status === "present") { present++; if (s.located) located++; }
+    else absent++;
+  };
+  ext.variables.forEach((v) => { visit(v.meaning); visit(v.initialValue); });
+  ext.parameters.forEach((p) => { visit(p.value); visit(p.meaning); visit(p.units); });
+  ext.driftTerms.forEach((t) => visit(t.expression));
+  ext.diffusionTerms.forEach((t) => visit(t.expression));
+  visit(ext.timeSpan.initialTime); visit(ext.timeSpan.finalTime);
+  return { present, absent, total: present + absent, located };
+}
+
+// ---- real telemetry heartbeat (replaces the hardcoded "engine + loom: live" pill) -------------
+// The validation_events table IS the telemetry/loom spine; its most recent row is genuine evidence of
+// activity. Returns the latest event timestamp, or null if there's been none (honest "no activity").
+export async function loadHeartbeat(): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("validation_events").select("created_at")
+    .order("created_at", { ascending: false }).limit(1);
+  if (error) { console.error("loadHeartbeat:", error.message); return null; }
+  return (data?.[0]?.created_at as string | undefined) ?? null;
+}

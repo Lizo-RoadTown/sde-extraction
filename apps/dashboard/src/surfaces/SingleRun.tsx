@@ -5,7 +5,7 @@ import {
   type UploadedPaper, type JobTarget,
 } from "../data";
 import { renderFigureThumbs, type FigureThumb } from "../cropFigures";
-import { supabaseConfigured } from "../lib/supabase";
+import { supabaseConfigured, PATHS, activeSchema, setActiveSchema } from "../lib/supabase";
 import { Link } from "../router";
 import { Loader } from "./Loader";
 import type { FigureExtraction } from "../types";
@@ -132,6 +132,8 @@ export function SingleRun() {
       <SectionTitle hint="Walk the whole process: add a paper, the system finds its figures, you pick the one to reproduce, and watch the engine search the page for what it needed — verify with the proof in view. New here? Start here. Doing many at once? Use Bulk.">
         Walkthrough
       </SectionTitle>
+
+      <PathChooser />
 
       <fieldset disabled={busy} className={cx(busy && "opacity-60")}>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -287,5 +289,43 @@ export function SingleRun() {
         </div>
       )}
     </div>
+  );
+}
+
+// Prominent path chooser ON the Walkthrough (above the upload), because the header dropdown is easy to
+// miss. Switching reloads the page (setActiveSchema) so the supabase client + queue point at the chosen
+// schema — the choice decides which worker/engine processes the paper you're about to upload.
+function PathChooser() {
+  const active = activeSchema();
+  return (
+    <Card className="flex flex-col gap-2">
+      <div className="text-sm font-medium text-ink">How should this paper be run?</div>
+      <div className="text-[11px] text-ink-faint">
+        Same app, same result — only the engine differs. Pick before you upload; this is what decides which
+        worker processes it.
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {PATHS.map((p) => {
+          const selected = p.schema === active;
+          return (
+            <button type="button" key={p.schema}
+              onClick={() => { if (!selected) setActiveSchema(p.schema); }}
+              aria-pressed={selected ? "true" : "false"}
+              className={cx(
+                "flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition",
+                selected
+                  ? "border-active-edge bg-active-soft"
+                  : "border-edge bg-surface-raised/40 hover:border-active-edge",
+              )}>
+              <div className="flex w-full items-center justify-between gap-2">
+                <span className={cx("text-sm font-medium", selected ? "text-active" : "text-ink")}>{p.label}</span>
+                {selected && <Badge tone="cyan">selected</Badge>}
+              </div>
+              <span className="text-[11px] text-ink-faint">{p.blurb}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }

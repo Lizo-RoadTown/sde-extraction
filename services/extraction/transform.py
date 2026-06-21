@@ -93,15 +93,20 @@ class ReproductionRecord(BaseModel):
     term_transforms: list[TermTransform] = []   # how each term was lifted (stage 2, observable)
     model: Optional[ExecutableModel] = None     # the executable curation model (input to stage 3)
     seed: int = 0                               # the fixed seed — why re-runs match (determinism)
+    ran_ok: Optional[bool] = None               # did the curation harness run without error? (None = not attempted)
     result_sha256: str = ""                     # hash of the simulation result (first run)
     rerun_sha256: str = ""                      # hash of a second run at the same seed
-    figure_reproduced: Optional[bool] = None    # ran AND result_sha256 == rerun_sha256
+    figure_reproduced: Optional[bool] = None    # ran-ok AND result_sha256 == rerun_sha256
     status: ReproStatus = "not_run"
     note: str = ""                              # why it failed, if it failed
 
     def decide(self) -> "ReproductionRecord":
-        """Compute the verdict from the recorded runs — same results each time = reproduced."""
-        if not self.result_sha256 or not self.rerun_sha256:
+        """Compute the verdict — two parts, both required: the harness RAN without error AND the two
+        runs hash-match (same results each time). A run that errored is 'failed', NOT 'not_run' — those
+        are different facts and we never collapse them into a guess."""
+        if self.ran_ok is False:
+            self.status, self.figure_reproduced = "failed", False
+        elif not self.result_sha256 or not self.rerun_sha256:
             self.status, self.figure_reproduced = "not_run", None
         elif self.result_sha256 == self.rerun_sha256:
             self.status, self.figure_reproduced = "reproduced", True
