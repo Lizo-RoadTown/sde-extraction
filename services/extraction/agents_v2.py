@@ -13,9 +13,13 @@ import base64
 import os
 from typing import Any, Optional
 
+from pydantic import BaseModel
+
 from assemble import absent_slot
 from classification import ModelClassification, registry_reference
+from classification import TRANSFORMATIONS as _TRANSFORMATIONS
 from schema import FigureRead, TimeSpan, VariableExtraction
+from transform import ExecutableModel, safe_code_check, sha256_text
 
 
 READ_FIGURE_SYSTEM = """You read ONE figure from a stochastic-differential-equation (SDE) epidemiological paper.
@@ -210,7 +214,155 @@ def classify_model(
             pass
 
 
-# ---- the per-variable gate agent (real detect for `terms`; classify is model-level) -------------
+# ---- transform gate: verbatim terms -> executable curation model (behind the safety guard) -----
+
+class _VarCode(BaseModel):
+    """The LLM's proposed executable form for ONE variable's equation."""
+    symbol: str
+    drift_rhs: str = ""          # executable Python expression for this variable's drift (uses y[],p[])
+    diffusion_rhs: str = ""      # ... its diffusion
+    initial_value: float = 0.0   # numeric initial condition
+    steps: list[str] = []        # classification.TRANSFORMATIONS names applied (or proposed new)
+
+
+class _NamedValue(BaseModel):
+    """A (parameter, numeric value) pair — a list of these instead of an open dict, since strict
+    structured outputs reject open-ended dict[str, float]."""
+    name: str
+    value: float = 0.0
+
+
+class ExecutableProposal(BaseModel):
+    """The LLM's proposed executable curation model: per-variable RHS + the index orders + numerics.
+    A SCRIPT (build_executable) assembles drift_code/diffusion_code from this and SAFETY-CHECKS them
+    before they are ever accepted — the LLM never hands exec-ready code straight through."""
+    variable_order: list[str] = []          # defines y[] index order (symbols)
+    parameter_order: list[str] = []         # defines p[] index order (symbols)
+    parameter_values: list[_NamedValue] = []
+    initial_time: float = 0.0
+    final_time: float = 0.0
+    calculus: str = "ito"
+    variables: list[_VarCode] = []
+
+
+TRANSFORM_SYSTEM = """You turn a lifted SDE epidemiological model into the EXECUTABLE BioModels curation
+model that a diffrax harness runs. For each state variable, write its drift and diffusion right-hand
+sides as plain Python EXPRESSIONS over:
+  - t        : time (scalar)
+  - y[i]     : the state variables, indexed by `variable_order` (0-based)
+  - p[j]     : the parameters, indexed by `parameter_order` (0-based)
+Only t, y, p and math / jnp / jax functions and arithmetic are allowed — no imports, no other names,
+no attribute access except math./jnp./jax. CALL EVERY MATH FUNCTION WITH AN EXPLICIT PREFIX:
+jnp.sqrt(...), jnp.exp(...), jnp.log(...), jnp.maximum(...), jnp.sin(...) — NEVER a bare name like
+sqrt/exp/max (those are not in scope and will be rejected). Each RHS is ONE expression (it becomes one
+entry of the returned list). Honor the calculus convention (Itô unless told otherwise); for demographic/CLE noise
+the diffusion entries are typically √rate terms. Give numeric initial_value per variable and numeric
+parameter_values; if a value isn't stated, use a reasonable placeholder and keep going. Name the
+classification TRANSFORMATIONS you applied in each variable's `steps` (or propose a new name).
+
+Available transformation names:
+%s"""
+
+
+def _known_transform_names() -> set:
+    return {t.name for t in _TRANSFORMATIONS}
+
+
+def build_executable(
+    *, model_dump: dict[str, Any], classification: dict[str, Any],
+    pdf_url: Optional[str], no_llm: bool = False,
+) -> dict[str, Any]:
+    """Transform gate: LLM proposes per-variable executable RHS → a SCRIPT assembles drift_code/
+    diffusion_code and runs safe_code_check BEFORE accepting. Returns the ExecutableModel (only if it
+    passes the safety guard), the recorded term-transforms, and honest safe/reasons. Never runs the
+    model and never sets a reproduction verdict — that's the oracle's separate, later job."""
+    blank = {"executable": None, "safe": False, "wired": False, "reasons": ["not wired"], "term_transforms": []}
+    if no_llm or not pdf_url:
+        return blank
+
+    from openai import OpenAI  # lazy
+
+    from processor import MODEL, _download
+
+    client = OpenAI()
+    pdf_path = _download(pdf_url)
+    try:
+        with open(pdf_path, "rb") as f:
+            uploaded = client.files.create(file=f, purpose="user_data")
+        drift = {t.get("variable"): (t.get("expression") or {}) for t in model_dump.get("drift_terms", [])}
+        diff = {t.get("variable"): (t.get("expression") or {}) for t in model_dump.get("diffusion_terms", [])}
+        syms = [v.get("symbol") for v in model_dump.get("variables", [])]
+        params = [p.get("symbol") for p in model_dump.get("parameters", [])]
+        instr = (
+            f"Calculus: {classification.get('calculus_convention', 'ito')}. Variables {syms}; parameters "
+            f"{params}. Verbatim drift per variable: "
+            f"{ {k: (v.get('value') if isinstance(v, dict) else v) for k, v in drift.items()} }. "
+            f"Verbatim diffusion: { {k: (v.get('value') if isinstance(v, dict) else v) for k, v in diff.items()} }. "
+            f"Produce the executable curation model."
+        )
+        resp = client.responses.parse(
+            model=MODEL,
+            input=[{"role": "system", "content": TRANSFORM_SYSTEM % registry_reference()},
+                   {"role": "user", "content": [
+                       {"type": "input_file", "file_id": uploaded.id},
+                       {"type": "input_text", "text": instr},
+                   ]}],
+            text_format=ExecutableProposal,
+        )
+        prop = resp.output_parsed
+    finally:
+        try:
+            os.remove(pdf_path)
+        except OSError:
+            pass
+
+    # ---- deterministic assembly + safety gate (no LLM past here) ----
+    order = prop.variable_order or [v.symbol for v in prop.variables]
+    by_sym = {v.symbol: v for v in prop.variables}
+    ordered = [by_sym[s] for s in order if s in by_sym]
+    if not ordered:
+        return {"executable": None, "safe": False, "wired": True, "reasons": ["no variables proposed"], "term_transforms": []}
+    n = len(ordered)
+    drift_code = "return [" + ", ".join((v.drift_rhs or "0.0") for v in ordered) + "]"
+    diffusion_code = "return [" + ", ".join((v.diffusion_rhs or "0.0") for v in ordered) + "]"
+
+    ok_d, why_d = safe_code_check(drift_code, n)
+    ok_x, why_x = safe_code_check(diffusion_code, n)
+    safe = ok_d and ok_x
+    reasons = ([f"drift: {r}" for r in why_d] + [f"diffusion: {r}" for r in why_x]) if not safe else []
+
+    known = _known_transform_names()
+    term_transforms: list[dict[str, Any]] = []
+    for v in ordered:
+        for kind, rhs in (("drift", v.drift_rhs), ("diffusion", v.diffusion_rhs)):
+            before = (drift if kind == "drift" else diff).get(v.symbol, {})
+            before_q = before.get("value") if isinstance(before, dict) else ""
+            term_transforms.append({
+                "field_path": f"{kind}:{v.symbol}", "variable": v.symbol,
+                "before": before_q, "before_sha256": sha256_text(before_q or ""),
+                "after": rhs, "after_sha256": sha256_text(rhs or ""),
+                "steps": [{"transformation": s, "is_new": s not in known} for s in v.steps],
+            })
+
+    executable = None
+    code_sha = ""
+    if safe:
+        em = ExecutableModel(
+            variable_names=order, parameter_names=prop.parameter_order or params,
+            initial_values={v.symbol: v.initial_value for v in ordered},
+            parameter_values={nv.name: nv.value for nv in prop.parameter_values},
+            initial_time=prop.initial_time, final_time=prop.final_time,
+            drift_code=drift_code, diffusion_code=diffusion_code,
+        )
+        code_sha = sha256_text(drift_code + "\n" + diffusion_code)
+        em.code_sha256 = code_sha
+        executable = em.model_dump()
+
+    return {"executable": executable, "safe": safe, "wired": True, "reasons": reasons,
+            "code_sha256": code_sha, "term_transforms": term_transforms}
+
+
+# ---- the per-variable gate agent (real detect for `terms`; classify + transform are model-level) -
 
 def make_agent(*, pdf_url: Optional[str], region: Optional[dict[str, Any]] = None, no_llm: bool = False):
     """Build the flow_v2.Agent whose detect/validate are wired for the gates we've implemented. Gate
@@ -249,4 +401,8 @@ def make_agent(*, pdf_url: Optional[str], region: Optional[dict[str, Any]] = Non
         return classify_model(model_dump=model_dump, figure_read=figure_read,
                               pdf_url=pdf_url, no_llm=no_llm).model_dump()
 
-    return Agent(detect=detect, validate=validate, classify=classify)
+    def transform(model_dump, classification):
+        return build_executable(model_dump=model_dump, classification=classification,
+                                pdf_url=pdf_url, no_llm=no_llm)
+
+    return Agent(detect=detect, validate=validate, classify=classify, transform=transform)

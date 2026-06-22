@@ -156,7 +156,8 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
                     # the gated-flow audit, stored with the extraction so the gates are observable
                     "flow_v2": {"crosscheck": fv["crosscheck"], "gate_log": fv["gate_log"],
                                 "figure_read_wired": fv["figure_read_wired"],
-                                "classification": fv.get("classification")},
+                                "classification": fv.get("classification"),
+                                "executable": fv.get("executable")},
                 }
             except Exception as e:  # noqa: BLE001 — flow_v2 missing/errored: fall back, never drop the job
                 print(f"  flow_v2 engine unavailable ({e}); falling back to direct")
@@ -181,6 +182,9 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
             _cls = result["flow_v2"].get("classification")
             if _cls:
                 model["_classification"] = _cls  # formulation family (registry-matched, evidence-anchored)
+            _exe = result["flow_v2"].get("executable")
+            if _exe:
+                model["_executable"] = _exe  # executable curation model (only if it passed the safety guard)
         pid = str(job["paper_id"])
         # Hooks (best-effort telemetry → validation_events): the extract + locate stages.
         locs = result.get("locations") or {}
@@ -244,6 +248,16 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
                        lineage_ref=ext_id, tags={**intake, "figure": figure, "family": fam,
                                                  "family_is_new": _cls.get("family_is_new", False),
                                                  "calculus": _cls.get("calculus_convention")})
+        # Transform seam: did we produce a SAFE executable curation model (passed the AST guard)? No run,
+        # no verdict here — just whether an executable model was built. pass = safe code; flag otherwise.
+        _exe = (result.get("flow_v2") or {}).get("executable") or {}
+        if _exe.get("wired"):
+            hooks.emit(conn, point="transform", subject_kind="agent",
+                       outcome="pass" if _exe.get("safe") else "flag",
+                       job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="transform:executable_model",
+                       lineage_ref=ext_id, tags={**intake, "figure": figure, "safe": _exe.get("safe", False),
+                                                 "code_sha256": (_exe.get("code_sha256") or "")[:16],
+                                                 "reasons": (_exe.get("reasons") or [])[:3]})
         print(f"job {job_id}: stored extraction {ext_id} (needs_human)")
         # Capture the FULL orchestration run (Dagster path only) into OUR store — the observability is
         # the whole point. Best-effort: never let a telemetry write fail the job.

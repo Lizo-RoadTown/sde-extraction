@@ -62,6 +62,7 @@ GATES: list[Gate] = [
 DetectFn = Callable[[str, Gate, FigureRead, "VariableState"], dict[str, Any]]
 ValidateFn = Callable[[str, Gate, "VariableState"], SlotVerdict]
 ClassifyFn = Callable[[dict[str, Any], FigureRead], dict[str, Any]]
+TransformFn = Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
 
 
 def _stub_detect(symbol: str, gate: Gate, figure_read: FigureRead, state: "VariableState") -> dict[str, Any]:
@@ -78,6 +79,11 @@ def _stub_classify(model_dump: dict[str, Any], figure_read: FigureRead) -> dict[
     return {"family_name": "unclassified", "family_is_new": False, "wired": False}
 
 
+def _stub_transform(model_dump: dict[str, Any], classification: dict[str, Any]) -> dict[str, Any]:
+    """No agent wired: no executable model produced."""
+    return {"executable": None, "safe": False, "wired": False, "reasons": ["not wired"], "term_transforms": []}
+
+
 @dataclass
 class Agent:
     """The per-variable agent (detect/validate, walks each variable through the gates) plus the
@@ -85,6 +91,7 @@ class Agent:
     detect: DetectFn = _stub_detect
     validate: ValidateFn = _stub_validate
     classify: ClassifyFn = _stub_classify
+    transform: TransformFn = _stub_transform
 
 
 AGENT = Agent()  # default (stubs). Replace AGENT.detect / AGENT.validate to wire real LLM gates.
@@ -150,6 +157,11 @@ def run_flow_v2(figure_read: FigureRead, agent: Agent = AGENT) -> dict[str, Any]
     # evidence-anchored, candidate-HITL for new families. The classified result wraps back to the figure.
     classification = agent.classify(model.model_dump(), figure_read)
 
+    # TRANSFORM (model-level): verbatim terms → executable curation model, gated by the AST safety guard
+    # and recorded as term-transforms. Produces the ExecutableModel only if it passes the guard. Does NOT
+    # run it or set any reproduction verdict — that's the oracle's separate, later job.
+    executable = agent.transform(model.model_dump(), classification)
+
     staged = StagedExtraction(
         figure_read=figure_read,
         per_variable=ves,
@@ -161,6 +173,7 @@ def run_flow_v2(figure_read: FigureRead, agent: Agent = AGENT) -> dict[str, Any]
         "staged": staged,
         "crosscheck": summary,
         "classification": classification,
+        "executable": executable,
         "gate_log": {s.symbol: [r.__dict__ for r in s.gate_log] for s in states},
         "agent_wired": agent.detect is not _stub_detect,
     }
