@@ -139,6 +139,33 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
                 result = processor.run(
                     pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
                 )
+        elif engine == "flow_v2":
+            # The gated, figure-anchored, per-variable flow (read_figure → per-variable gates →
+            # deterministic assemble). Adapt its output to the worker's result shape.
+            try:
+                import flow_v2
+                from schema import checksums_for
+                fv = flow_v2.run_from_pdf(
+                    pdf_url=pdf_url, figure_label=figure_label,
+                    region=(target or {}).get("region"), no_llm=dry_run,
+                )
+                staged = fv["staged"]
+                result = {
+                    "model": staged.model.model_dump(),
+                    "checksums": checksums_for(staged.model),
+                    # the gated-flow audit, stored with the extraction so the gates are observable
+                    "flow_v2": {"crosscheck": fv["crosscheck"], "gate_log": fv["gate_log"],
+                                "figure_read_wired": fv["figure_read_wired"],
+                                "classification": fv.get("classification"),
+                                "executable": fv.get("executable")},
+                }
+            except Exception as e:  # noqa: BLE001 — flow_v2 missing/errored: fall back, never drop the job
+                print(f"  flow_v2 engine unavailable ({e}); falling back to direct")
+                engine = "direct"
+                intake["engine"] = "direct"
+                result = processor.run(
+                    pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
+                )
         else:
             result = processor.run(
                 pdf_url=pdf_url, figure_label=figure_label, target=target, no_llm=dry_run,
@@ -150,6 +177,14 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
         fig_prov = result.get("figure_provenance")
         if fig_prov:
             model["_figure_provenance"] = fig_prov  # which figure was isolated: page/bbox/tool/dual SHA
+        if result.get("flow_v2"):
+            model["_flow_v2"] = result["flow_v2"]  # gated-flow audit (crosscheck + per-variable gate log)
+            _cls = result["flow_v2"].get("classification")
+            if _cls:
+                model["_classification"] = _cls  # formulation family (registry-matched, evidence-anchored)
+            _exe = result["flow_v2"].get("executable")
+            if _exe:
+                model["_executable"] = _exe  # executable curation model (only if it passed the safety guard)
         pid = str(job["paper_id"])
         # Hooks (best-effort telemetry → validation_events): the extract + locate stages.
         locs = result.get("locations") or {}
@@ -191,6 +226,38 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
         hooks.emit(conn, point="store", subject_kind="script", outcome="pass",
                    job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="storage",
                    lineage_ref=ext_id, tags={**intake, "status": "needs_human"})
+        # Per-gate seams (flow_v2): one validation_event per variable per gate — the gated flow made
+        # observable (recorded-transformation rule 5). subject = the variable; lineage = the stored
+        # extraction; every gate wraps back to the figure (tag). No-op on non-flow_v2 engines.
+        for _sym, _gates in ((result.get("flow_v2") or {}).get("gate_log") or {}).items():
+            for _g in _gates:
+                _v = _g.get("verdict")
+                hooks.emit(conn, point=f"gate:{_g.get('gate')}", subject_kind="agent",
+                           outcome={"agree": "pass", "disagree": "fail"}.get(_v, "flag"),
+                           job_id=job_id, paper_id=pid, thread_id=job_id,
+                           subject_id=f"var:{_sym}", lineage_ref=ext_id,
+                           tags={**intake, "gate": _g.get("gate"), "verdict": _v, "figure": figure,
+                                 "wired": (_g.get("detection") or {}).get("wired", False)})
+        # Classify seam: which formulation family the model was identified as (or unclassified / new → HITL).
+        _cls = (result.get("flow_v2") or {}).get("classification") or {}
+        if _cls:
+            fam = _cls.get("family_name") or "unclassified"
+            hooks.emit(conn, point="classify", subject_kind="agent",
+                       outcome="flag" if (fam == "unclassified" or _cls.get("family_is_new")) else "pass",
+                       job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="classifier:formulation_family",
+                       lineage_ref=ext_id, tags={**intake, "figure": figure, "family": fam,
+                                                 "family_is_new": _cls.get("family_is_new", False),
+                                                 "calculus": _cls.get("calculus_convention")})
+        # Transform seam: did we produce a SAFE executable curation model (passed the AST guard)? No run,
+        # no verdict here — just whether an executable model was built. pass = safe code; flag otherwise.
+        _exe = (result.get("flow_v2") or {}).get("executable") or {}
+        if _exe.get("wired"):
+            hooks.emit(conn, point="transform", subject_kind="agent",
+                       outcome="pass" if _exe.get("safe") else "flag",
+                       job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="transform:executable_model",
+                       lineage_ref=ext_id, tags={**intake, "figure": figure, "safe": _exe.get("safe", False),
+                                                 "code_sha256": (_exe.get("code_sha256") or "")[:16],
+                                                 "reasons": (_exe.get("reasons") or [])[:3]})
         print(f"job {job_id}: stored extraction {ext_id} (needs_human)")
         # Capture the FULL orchestration run (Dagster path only) into OUR store — the observability is
         # the whole point. Best-effort: never let a telemetry write fail the job.

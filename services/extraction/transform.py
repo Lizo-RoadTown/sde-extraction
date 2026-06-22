@@ -14,7 +14,9 @@ The four recorded stages (each a SEAM):
 """
 from __future__ import annotations
 
+import ast
 import hashlib
+import textwrap
 from typing import Literal, Optional
 
 from pydantic import BaseModel
@@ -113,3 +115,82 @@ class ReproductionRecord(BaseModel):
         else:
             self.status, self.figure_reproduced = "failed", False
         return self
+
+
+# ============================================================
+# TRANSFORM-GATE SAFETY (determinism-web guard, stage 2)
+# The oracle exec()s drift_code/diffusion_code (oracle.py:52). Before any LLM-proposed curation code is
+# accepted (or ever run), it MUST pass this deterministic whitelist: only t/y/p + math/jnp/jax + plain
+# arithmetic; no imports, no attribute access off those roots, no dunders, no unlisted calls. This is the
+# determinism-web seam — the LLM proposes, a script verifies; nothing fuzzy reaches exec() unchecked.
+# ============================================================
+
+_ALLOWED_ATTR_ROOTS = {"math", "jnp", "jax"}            # the oracle's exec namespace (oracle.py:49)
+_ALLOWED_BUILTINS = {"abs", "min", "max", "sum", "len", "range", "float", "int", "pow"}
+_ALLOWED_BASE_NAMES = {"t", "y", "p"} | _ALLOWED_ATTR_ROOTS | _ALLOWED_BUILTINS
+_ALLOWED_NODES = (
+    ast.Module, ast.FunctionDef, ast.arguments, ast.arg,
+    ast.Return, ast.Assign, ast.AugAssign, ast.Expr, ast.Raise,
+    ast.If, ast.IfExp, ast.For, ast.comprehension,
+    ast.ListComp, ast.GeneratorExp, ast.SetComp, ast.DictComp,
+    ast.List, ast.Tuple, ast.Dict, ast.Set, ast.Slice, ast.Starred,
+    ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare,
+    ast.Call, ast.keyword, ast.Attribute, ast.Subscript,
+    ast.Name, ast.Load, ast.Store, ast.Constant,
+    ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow,
+    ast.USub, ast.UAdd, ast.And, ast.Or, ast.Not,
+    ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE,
+)
+
+
+def safe_code_check(code: str, n_vars: int = 0) -> tuple[bool, list[str]]:
+    """Deterministic safety gate for an LLM-proposed curation-term body (drift_code/diffusion_code),
+    checked BEFORE it is ever exec'd. Returns (ok, reasons). Wraps the body as `def _f(t,y,p): <body>`
+    and rejects anything outside the whitelist. When the return is a literal list/tuple, checks its
+    length == n_vars. Conservative by design: on any doubt it rejects (safe default)."""
+    reasons: list[str] = []
+    body = (code or "").strip()
+    if not body:
+        return False, ["empty code"]
+    try:
+        tree = ast.parse("def _f(t, y, p):\n" + textwrap.indent(body, "    "))
+    except SyntaxError as e:
+        return False, [f"syntax error: {e}"]
+
+    fn = tree.body[0]
+    assigned = {t.id for n in ast.walk(fn) if isinstance(n, ast.Assign)
+                for t in n.targets if isinstance(t, ast.Name)}
+    compvars = {n.target.id for n in ast.walk(fn)
+                if isinstance(n, ast.comprehension) and isinstance(n.target, ast.Name)}
+    allowed_names = _ALLOWED_BASE_NAMES | assigned | compvars
+
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_NODES):
+            reasons.append(f"disallowed syntax: {type(node).__name__}")
+            continue
+        if isinstance(node, ast.Attribute):
+            if node.attr.startswith("__"):
+                reasons.append(f"dunder attribute: {node.attr}")
+            if not (isinstance(node.value, ast.Name) and node.value.id in _ALLOWED_ATTR_ROOTS):
+                reasons.append("attribute access only on math/jnp/jax")
+        if isinstance(node, ast.Call):
+            f = node.func
+            ok = ((isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name)
+                   and f.value.id in _ALLOWED_ATTR_ROOTS)
+                  or (isinstance(f, ast.Name) and f.id in _ALLOWED_BUILTINS))
+            if not ok:
+                reasons.append("only math/jnp/jax.* or safe builtins may be called")
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            if node.id.startswith("__"):
+                reasons.append(f"dunder name: {node.id}")
+            elif node.id not in allowed_names:
+                reasons.append(f"unknown name: {node.id}")
+
+    returns = [n for n in ast.walk(fn) if isinstance(n, ast.Return)]
+    if not returns:
+        reasons.append("no return statement")
+    elif n_vars:
+        for r in returns:
+            if isinstance(r.value, (ast.List, ast.Tuple)) and len(r.value.elts) != n_vars:
+                reasons.append(f"return length {len(r.value.elts)} != n_vars {n_vars}")
+    return (len(reasons) == 0), sorted(set(reasons))
