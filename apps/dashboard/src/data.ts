@@ -3,7 +3,7 @@
 // (If Supabase isn't configured, these return empty; the AuthGate prevents that on
 // the deployed site by requiring login first.)
 
-import { supabase } from "./lib/supabase";
+import { supabase, activeSchema } from "./lib/supabase";
 import { isPreview } from "./usePreview";
 import { SAMPLE_ESCALATIONS } from "./preview";
 import type { FigureExtraction, GatedFlow, Job, Slot, Variable, Parameter, Term } from "./types";
@@ -166,6 +166,10 @@ export interface JobTarget {
   // anchors extraction to this region, not the label. See figures.isolate_region.
   region?: { page: number; bbox_norm: [number, number, number, number] };
   lane?: "walkthrough" | "bulk"; // which audience lane enqueued it (the worker copies it to the extraction)
+  // Which pipeline runs this job. Stamped by the dashboard from the chosen PATH so the WEBSITE decides
+  // the engine — the worker reads target.engine first (worker.py:114), so no server-side setting is
+  // needed. Gated-flow path → "flow_v2"; baseline path → unset (worker default "direct").
+  engine?: "direct" | "dagster" | "flow_v2";
 }
 
 // A figure the server-side detector (PyMuPDF) found in the paper — what the human chooses from.
@@ -199,9 +203,13 @@ export async function loadDetectedFigures(paperId: string): Promise<DetectedFigu
  */
 export async function enqueueJob(paperId: string, figureLabel: string, target: JobTarget): Promise<string | null> {
   if (!supabase) return null;
+  // Stamp the engine from the active PATH so the website drives it (no Render setting needed). The
+  // gated-flow path (dagster_app schema) runs flow_v2; the baseline path leaves it to the worker default.
+  const engine = activeSchema() === "dagster_app" ? "flow_v2" : undefined;
+  const fullTarget: JobTarget = engine ? { ...target, engine } : target;
   const { data, error } = await supabase
     .from("extraction_jobs")
-    .insert({ paper_id: paperId, figure_label: figureLabel, stage: "queued", target })
+    .insert({ paper_id: paperId, figure_label: figureLabel, stage: "queued", target: fullTarget })
     .select("id")
     .single();
   if (error || !data) { if (error) console.error("enqueueJob:", error.message); return null; }
