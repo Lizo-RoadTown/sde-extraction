@@ -14,6 +14,7 @@ import os
 from typing import Any, Optional
 
 from assemble import absent_slot
+from classification import ModelClassification, registry_reference
 from schema import FigureRead, TimeSpan, VariableExtraction
 
 
@@ -152,7 +153,64 @@ def extract_variable(
             pass
 
 
-# ---- the per-variable gate agent (real detect for `terms`; other gates stay honest stubs) -------
+# ---- classify gate: identify the model's formulation family against the registry ---------------
+
+CLASSIFY_SYSTEM = """You identify which stochastic FORMULATION FAMILY a lifted SDE epidemiological model
+belongs to, matching it against a KNOWN REGISTRY. Identification only — never change the model's values.
+
+Rules: anchor your call to the paper with a verbatim evidence_quote + page so it can be verified. If you
+cannot determine the family, set family_name='unclassified'. If the model is a real family NOT in the
+registry, set family_is_new=true and propose a name (a human audits it before it joins the registry).
+Also record the calculus convention (Itô/Stratonovich, if stated) and any transformations from the
+registry that were applied.
+
+REGISTRY (match against these names; do not invent names unless family_is_new=true):
+%s"""
+
+
+def classify_model(
+    *, model_dump: dict[str, Any], figure_read: FigureRead,
+    pdf_url: Optional[str], no_llm: bool = False,
+) -> ModelClassification:
+    """Classify the assembled model's formulation family against classification.FORMULATION_FAMILIES.
+    Registry-matched + evidence-anchored (verifiable), with the candidate-HITL flag for new families.
+    Returns 'unclassified' on no_llm / no PDF so the deterministic spine still runs."""
+    if no_llm or not pdf_url:
+        return ModelClassification(family_name="unclassified")
+
+    from openai import OpenAI  # lazy
+
+    from processor import MODEL, _download
+
+    client = OpenAI()
+    pdf_path = _download(pdf_url)
+    try:
+        with open(pdf_path, "rb") as f:
+            uploaded = client.files.create(file=f, purpose="user_data")
+        instr = (
+            f"Figure '{figure_read.figure_label}' (pathogen: {figure_read.pathogen or 'n/a'}). The lifted "
+            f"model has variables {[v.get('symbol') for v in model_dump.get('variables', [])]} and "
+            f"parameters {[p.get('symbol') for p in model_dump.get('parameters', [])]}, with drift and "
+            f"diffusion terms. Identify its formulation family against the registry, with evidence."
+        )
+        resp = client.responses.parse(
+            model=MODEL,
+            input=[{"role": "system", "content": CLASSIFY_SYSTEM % registry_reference()},
+                   {"role": "user", "content": [
+                       {"type": "input_file", "file_id": uploaded.id},
+                       {"type": "input_text", "text": instr},
+                   ]}],
+            text_format=ModelClassification,
+        )
+        return resp.output_parsed
+    finally:
+        try:
+            os.remove(pdf_path)
+        except OSError:
+            pass
+
+
+# ---- the per-variable gate agent (real detect for `terms`; classify is model-level) -------------
 
 def make_agent(*, pdf_url: Optional[str], region: Optional[dict[str, Any]] = None, no_llm: bool = False):
     """Build the flow_v2.Agent whose detect/validate are wired for the gates we've implemented. Gate
@@ -187,4 +245,8 @@ def make_agent(*, pdf_url: Optional[str], region: Optional[dict[str, Any]] = Non
                                rationale="drift/diffusion captured" if ok else "no term captured")
         return SlotVerdict(field_path=f"{symbol}:{gate.key}", verdict="uncertain", rationale="agent not wired")
 
-    return Agent(detect=detect, validate=validate)
+    def classify(model_dump, figure_read):
+        return classify_model(model_dump=model_dump, figure_read=figure_read,
+                              pdf_url=pdf_url, no_llm=no_llm).model_dump()
+
+    return Agent(detect=detect, validate=validate, classify=classify)

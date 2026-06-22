@@ -155,7 +155,8 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
                     "checksums": checksums_for(staged.model),
                     # the gated-flow audit, stored with the extraction so the gates are observable
                     "flow_v2": {"crosscheck": fv["crosscheck"], "gate_log": fv["gate_log"],
-                                "figure_read_wired": fv["figure_read_wired"]},
+                                "figure_read_wired": fv["figure_read_wired"],
+                                "classification": fv.get("classification")},
                 }
             except Exception as e:  # noqa: BLE001 — flow_v2 missing/errored: fall back, never drop the job
                 print(f"  flow_v2 engine unavailable ({e}); falling back to direct")
@@ -177,6 +178,9 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
             model["_figure_provenance"] = fig_prov  # which figure was isolated: page/bbox/tool/dual SHA
         if result.get("flow_v2"):
             model["_flow_v2"] = result["flow_v2"]  # gated-flow audit (crosscheck + per-variable gate log)
+            _cls = result["flow_v2"].get("classification")
+            if _cls:
+                model["_classification"] = _cls  # formulation family (registry-matched, evidence-anchored)
         pid = str(job["paper_id"])
         # Hooks (best-effort telemetry → validation_events): the extract + locate stages.
         locs = result.get("locations") or {}
@@ -230,6 +234,16 @@ def process_one(conn, job: dict, *, dry_run: bool) -> None:
                            subject_id=f"var:{_sym}", lineage_ref=ext_id,
                            tags={**intake, "gate": _g.get("gate"), "verdict": _v, "figure": figure,
                                  "wired": (_g.get("detection") or {}).get("wired", False)})
+        # Classify seam: which formulation family the model was identified as (or unclassified / new → HITL).
+        _cls = (result.get("flow_v2") or {}).get("classification") or {}
+        if _cls:
+            fam = _cls.get("family_name") or "unclassified"
+            hooks.emit(conn, point="classify", subject_kind="agent",
+                       outcome="flag" if (fam == "unclassified" or _cls.get("family_is_new")) else "pass",
+                       job_id=job_id, paper_id=pid, thread_id=job_id, subject_id="classifier:formulation_family",
+                       lineage_ref=ext_id, tags={**intake, "figure": figure, "family": fam,
+                                                 "family_is_new": _cls.get("family_is_new", False),
+                                                 "calculus": _cls.get("calculus_convention")})
         print(f"job {job_id}: stored extraction {ext_id} (needs_human)")
         # Capture the FULL orchestration run (Dagster path only) into OUR store — the observability is
         # the whole point. Best-effort: never let a telemetry write fail the job.

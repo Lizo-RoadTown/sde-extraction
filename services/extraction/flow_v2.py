@@ -42,15 +42,14 @@ class Gate:
     detail: str = ""
 
 
+# Per-variable gates (each variable's agent walks these). `terms` is wired (its agent grabs the
+# variable's drift/diffusion + its own parameters). The earlier provisional noise_structure/form/
+# parameters stubs are removed: the model-level CLASSIFY stage (below, run_flow_v2) subsumes them
+# properly — it identifies the formulation family + calculus convention + transformations against the
+# classification registry, evidence-anchored, with the candidate-HITL track for new families.
 GATES: list[Gate] = [
     Gate("terms", "Locate this variable's drift & diffusion terms for THIS figure", "B",
-         "find the dX = (drift) dt + (diffusion) dW that belongs to this figure's variable"),
-    Gate("noise_structure", "Classify the noise structure", "E",
-         "additive vs multiplicative; demographic √rate vs environmental; driver (Wiener/Lévy/switching)"),
-    Gate("form", "Detect the SDE form / interpretation", "B",
-         "Itô vs Stratonovich; any change-of-variable / scaling the stated form carries"),
-    Gate("parameters", "Claim the parameters affecting this variable", "D",
-         "the constants in this variable's equation (reconciled across variables later)"),
+         "find the dX = (drift) dt + (diffusion) dW (+ this variable's params) for this figure's variable"),
 ]
 
 
@@ -62,6 +61,7 @@ GATES: list[Gate] = [
 
 DetectFn = Callable[[str, Gate, FigureRead, "VariableState"], dict[str, Any]]
 ValidateFn = Callable[[str, Gate, "VariableState"], SlotVerdict]
+ClassifyFn = Callable[[dict[str, Any], FigureRead], dict[str, Any]]
 
 
 def _stub_detect(symbol: str, gate: Gate, figure_read: FigureRead, state: "VariableState") -> dict[str, Any]:
@@ -73,11 +73,18 @@ def _stub_validate(symbol: str, gate: Gate, state: "VariableState") -> SlotVerdi
     return SlotVerdict(field_path=f"{symbol}:{gate.key}", verdict="uncertain", rationale="agent not wired")
 
 
+def _stub_classify(model_dump: dict[str, Any], figure_read: FigureRead) -> dict[str, Any]:
+    """No agent wired: don't guess a family."""
+    return {"family_name": "unclassified", "family_is_new": False, "wired": False}
+
+
 @dataclass
 class Agent:
-    """The per-variable agent: it follows ONE variable through every gate and validates at each."""
+    """The per-variable agent (detect/validate, walks each variable through the gates) plus the
+    model-level classify (identify the formulation family once the model is assembled)."""
     detect: DetectFn = _stub_detect
     validate: ValidateFn = _stub_validate
+    classify: ClassifyFn = _stub_classify
 
 
 AGENT = Agent()  # default (stubs). Replace AGENT.detect / AGENT.validate to wire real LLM gates.
@@ -139,6 +146,10 @@ def run_flow_v2(figure_read: FigureRead, agent: Agent = AGENT) -> dict[str, Any]
     model = assemble_model(figure_read, ves)
     gaps, summary = crosscheck(figure_read.panels, model)
 
+    # CLASSIFY (model-level): identify the formulation family against the registry — registry-matched,
+    # evidence-anchored, candidate-HITL for new families. The classified result wraps back to the figure.
+    classification = agent.classify(model.model_dump(), figure_read)
+
     staged = StagedExtraction(
         figure_read=figure_read,
         per_variable=ves,
@@ -149,6 +160,7 @@ def run_flow_v2(figure_read: FigureRead, agent: Agent = AGENT) -> dict[str, Any]
     return {
         "staged": staged,
         "crosscheck": summary,
+        "classification": classification,
         "gate_log": {s.symbol: [r.__dict__ for r in s.gate_log] for s in states},
         "agent_wired": agent.detect is not _stub_detect,
     }
