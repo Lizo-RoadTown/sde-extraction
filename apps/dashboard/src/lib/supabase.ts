@@ -11,8 +11,8 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 // The header path selector writes the choice to localStorage and reloads; default is public. The
 // matching worker for each schema (APP_SCHEMA + EXTRACTION_ENGINE) drains that schema's queue.
 export const PATHS = [
-  { schema: "public", label: "OpenAI / Pydantic", blurb: "AI extraction · no workflow" },
-  { schema: "dagster_app", label: "Dagster + OpenAI / Pydantic", blurb: "deterministic workflow over the AI" },
+  { schema: "public", label: "OpenAI / Pydantic", blurb: "single AI call · the baseline" },
+  { schema: "dagster_app", label: "Gated flow", blurb: "per-variable gates · classify · executable model" },
 ] as const;
 
 export function activeSchema(): string {
