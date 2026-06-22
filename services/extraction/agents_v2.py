@@ -57,7 +57,7 @@ def read_figure(
     import figures as F
     from processor import MODEL, _download
 
-    client = OpenAI()  # reads OPENAI_API_KEY
+    client = OpenAI(max_retries=8)  # reads OPENAI_API_KEY; retry/backoff to absorb 429s (TPM)
     pdf_path = _download(pdf_url)
     try:
         with open(pdf_path, "rb") as f:
@@ -134,7 +134,7 @@ def extract_variable(
 
     from processor import MODEL, _download
 
-    client = OpenAI()
+    client = OpenAI(max_retries=8)  # retry/backoff to absorb 429s (TPM)
     pdf_path = _download(pdf_url)
     try:
         with open(pdf_path, "rb") as f:
@@ -191,7 +191,7 @@ def classify_model(
 
     from processor import MODEL, _download
 
-    client = OpenAI()
+    client = OpenAI(max_retries=8)  # retry/backoff to absorb 429s (TPM)
     pdf_path = _download(pdf_url)
     try:
         with open(pdf_path, "rb") as f:
@@ -282,44 +282,35 @@ def build_executable(
     passes the safety guard), the recorded term-transforms, and honest safe/reasons. Never runs the
     model and never sets a reproduction verdict — that's the oracle's separate, later job."""
     blank = {"executable": None, "safe": False, "wired": False, "reasons": ["not wired"], "term_transforms": []}
-    if no_llm or not pdf_url:
+    if no_llm:
         return blank
 
     from openai import OpenAI  # lazy
 
-    from processor import MODEL, _download
+    from processor import MODEL
 
-    client = OpenAI()
-    pdf_path = _download(pdf_url)
-    try:
-        with open(pdf_path, "rb") as f:
-            uploaded = client.files.create(file=f, purpose="user_data")
-        drift = {t.get("variable"): (t.get("expression") or {}) for t in model_dump.get("drift_terms", [])}
-        diff = {t.get("variable"): (t.get("expression") or {}) for t in model_dump.get("diffusion_terms", [])}
-        syms = [v.get("symbol") for v in model_dump.get("variables", [])]
-        params = [p.get("symbol") for p in model_dump.get("parameters", [])]
-        instr = (
-            f"Calculus: {classification.get('calculus_convention', 'ito')}. Variables {syms}; parameters "
-            f"{params}. Verbatim drift per variable: "
-            f"{ {k: (v.get('value') if isinstance(v, dict) else v) for k, v in drift.items()} }. "
-            f"Verbatim diffusion: { {k: (v.get('value') if isinstance(v, dict) else v) for k, v in diff.items()} }. "
-            f"Produce the executable curation model."
-        )
-        resp = client.responses.parse(
-            model=MODEL,
-            input=[{"role": "system", "content": TRANSFORM_SYSTEM % registry_reference()},
-                   {"role": "user", "content": [
-                       {"type": "input_file", "file_id": uploaded.id},
-                       {"type": "input_text", "text": instr},
-                   ]}],
-            text_format=ExecutableProposal,
-        )
-        prop = resp.output_parsed
-    finally:
-        try:
-            os.remove(pdf_path)
-        except OSError:
-            pass
+    # No PDF here: the transform works from the verbatim terms the `terms` gate already lifted (in
+    # model_dump) + the classification. Skipping the PDF re-read keeps this gate's token cost low (helps
+    # stay under the org TPM limit) and is sufficient — it's a transcription/codegen step, not a re-read.
+    client = OpenAI(max_retries=8)  # absorb 429s with backoff (chains of gate calls can hit TPM)
+    drift = {t.get("variable"): (t.get("expression") or {}) for t in model_dump.get("drift_terms", [])}
+    diff = {t.get("variable"): (t.get("expression") or {}) for t in model_dump.get("diffusion_terms", [])}
+    syms = [v.get("symbol") for v in model_dump.get("variables", [])]
+    params = [p.get("symbol") for p in model_dump.get("parameters", [])]
+    instr = (
+        f"Calculus: {classification.get('calculus_convention', 'ito')}. Variables {syms}; parameters "
+        f"{params}. Verbatim drift per variable: "
+        f"{ {k: (v.get('value') if isinstance(v, dict) else v) for k, v in drift.items()} }. "
+        f"Verbatim diffusion: { {k: (v.get('value') if isinstance(v, dict) else v) for k, v in diff.items()} }. "
+        f"Produce the executable curation model (drift_rhs/diffusion_rhs over y[]/p[] per variable)."
+    )
+    resp = client.responses.parse(
+        model=MODEL,
+        input=[{"role": "system", "content": TRANSFORM_SYSTEM % registry_reference()},
+               {"role": "user", "content": [{"type": "input_text", "text": instr}]}],
+        text_format=ExecutableProposal,
+    )
+    prop = resp.output_parsed
 
     # ---- deterministic assembly + safety gate (no LLM past here) ----
     order = prop.variable_order or [v.symbol for v in prop.variables]
