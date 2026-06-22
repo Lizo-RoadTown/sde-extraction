@@ -35,12 +35,12 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
 
-  # DAGSTER-PATH worker — the SAME extraction worker, but EXTRACTION_ENGINE=dagster runs each job
-  # through the Dagster-orchestrated pipeline (dagster_flow.run_via_dagster) instead of processor.run.
-  # Identical app + result; only the orchestration differs (the PI's compare). Because APP_SCHEMA=
-  # dagster_app sets the search_path, it drains dagster_app.extraction_jobs while the worker above
-  # drains public.extraction_jobs — SEPARATE queues, no contention, both run at once. A job reaches
-  # this worker only when enqueued on the dashboard's Dagster path (which writes to dagster_app).
+  # GATED-FLOW worker — the SAME extraction worker, but EXTRACTION_ENGINE=flow_v2 runs each job through
+  # the figure-anchored, per-variable GATED pipeline (read_figure → terms → classify → transform →
+  # executable model), not processor.run. Because APP_SCHEMA=dagster_app sets the search_path, it drains
+  # dagster_app.extraction_jobs — its OWN queue, SEPARATE from the direct worker's public.extraction_jobs,
+  # so the direct path (the PI's baseline) is never touched. A job reaches this worker only when enqueued
+  # on the dashboard's gated-flow path. (Flip EXTRACTION_ENGINE back to "dagster" or "direct" to revert.)
   - name: sde-extraction-worker-dagster
     type: worker
     runtime: docker
@@ -56,7 +56,7 @@ services:
       - key: OPENAI_MODEL
         value: gpt-4o-2024-08-06
       - key: EXTRACTION_ENGINE
-        value: dagster
+        value: flow_v2
       - key: APP_SCHEMA
         value: dagster_app
       - key: OPENAI_API_KEY

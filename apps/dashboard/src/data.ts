@@ -6,7 +6,7 @@
 import { supabase } from "./lib/supabase";
 import { isPreview } from "./usePreview";
 import { SAMPLE_ESCALATIONS } from "./preview";
-import type { FigureExtraction, Job, Slot, Variable, Parameter, Term } from "./types";
+import type { FigureExtraction, GatedFlow, Job, Slot, Variable, Parameter, Term } from "./types";
 
 // ---- PDF storage: fingerprint, upload, signed URL ----------------------------
 // The PDF is the provenance root: it is SHA-256 fingerprinted the moment it lands,
@@ -136,6 +136,23 @@ function rowToExtraction(row: Record<string, unknown>): FigureExtraction {
       finalTime: pick<Slot>(ts, "final_time", "finalTime", absent),
     },
     figureReproduced: (row.figure_reproduced as boolean | null) ?? null,
+    gated: (() => {
+      // The gated engine (flow_v2) stashes its audit on the model: _classification, _executable, _flow_v2.
+      // Surface it only when present (direct/dagster extractions won't have it).
+      const fv = m._flow_v2 as Record<string, unknown> | undefined;
+      const cls = m._classification as Record<string, unknown> | undefined;
+      const exe = m._executable as Record<string, unknown> | undefined;
+      if (!fv && !cls && !exe) return undefined;
+      return {
+        classification: cls as GatedFlow["classification"],
+        executable: exe
+          ? { safe: exe.safe as boolean, reasons: exe.reasons as string[], code_sha256: exe.code_sha256 as string,
+              model: (exe.executable ?? null) as NonNullable<GatedFlow["executable"]>["model"] }
+          : undefined,
+        crosscheck: fv?.crosscheck as GatedFlow["crosscheck"],
+        gateLog: fv?.gate_log as GatedFlow["gateLog"],
+      } as GatedFlow;
+    })(),
   };
 }
 

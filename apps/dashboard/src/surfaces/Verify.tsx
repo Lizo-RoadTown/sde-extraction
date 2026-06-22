@@ -13,6 +13,7 @@ function completenessFrac(e: FigureExtraction): number {
 import { PdfPane } from "./PdfPane";
 import { FigurePane } from "./FigurePane";
 import { SpotlightQuest } from "./SpotlightQuest";
+import { GatedFlowPanel } from "./GatedFlowPanel";
 import type { FigureExtraction, Slot } from "../types";
 
 // The slot the verifier is focused on — drives the PDF pane's jump-to-source.
@@ -178,6 +179,10 @@ export function Detail({ ext, walkthrough = false, onResolved }: { ext: FigureEx
 
       {/* the MODEL — the SDE the figure required; what the parameters belong to */}
       <ModelView ext={ext} />
+
+      {/* the GATED FLOW depth — classification, per-variable gate verdicts, executable model — shown only
+          when this extraction came from the gated (flow_v2) engine. Real run output, not fabricated. */}
+      {ext.gated && <GatedFlowPanel gated={ext.gated} />}
 
       {/* the lineage made visible: the cinematic spotlight search — guided lane only */}
       {walkthrough && <SpotlightQuest ext={ext} />}

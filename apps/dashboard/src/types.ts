@@ -77,6 +77,23 @@ export interface FigureExtraction {
   diffusionTerms: Term[];
   timeSpan: TimeSpan;
   figureReproduced?: boolean | null; // the oracle: did captured values regenerate the figure?
+  // The gated-flow (flow_v2) audit, present only on extractions the gated engine produced. Renders the
+  // gated depth the standard view doesn't: the classified family, per-variable gate verdicts, and the
+  // executable curation model. All real, stored by the worker (_classification/_executable/_flow_v2).
+  gated?: GatedFlow;
+}
+
+export interface GatedFlow {
+  classification?: {
+    family_name?: string; family_is_new?: boolean; calculus_convention?: string;
+    transformations?: string[]; evidence_quote?: string; evidence_page?: number | null; rationale?: string;
+  };
+  executable?: {
+    safe?: boolean; reasons?: string[]; code_sha256?: string;
+    model?: { variable_names?: string[]; parameter_names?: string[]; drift_code?: string; diffusion_code?: string } | null;
+  };
+  crosscheck?: { panel_count?: number; captured_count?: number; missing?: string[]; complete?: boolean };
+  gateLog?: Record<string, { gate: string; verdict: string }[]>;
 }
 
 export type PipelineStage =
