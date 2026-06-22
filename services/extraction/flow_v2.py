@@ -145,13 +145,16 @@ def walk_variable(symbol: str, figure_read: FigureRead, agent: Agent = AGENT) ->
 def run_flow_v2(figure_read: FigureRead, agent: Agent = AGENT) -> dict[str, Any]:
     """The deterministic gated flow over one figure. Returns the assembled StagedExtraction plus the
     per-variable gate logs (the audit trail). The figure's `panels` are the variable checklist."""
-    # STEP 2: one agent per checklist variable, each walking the gates.
-    states = [walk_variable(sym, figure_read, agent) for sym in figure_read.panels if sym.strip()]
+    # STEP 2: one agent per variable in the FULL coupled state (state_variables), not just the plotted
+    # panels — otherwise the assembled model is open (missing coupled vars) and can't run. Fall back to
+    # panels when the reader didn't supply the full state.
+    checklist = figure_read.state_variables or figure_read.panels
+    states = [walk_variable(sym, figure_read, agent) for sym in checklist if sym.strip()]
     ves = [s.to_extraction() for s in states]
 
     # STEP 3: deterministic assembly (existing scripts) — reconcile shared params, assemble, crosscheck.
     model = assemble_model(figure_read, ves)
-    gaps, summary = crosscheck(figure_read.panels, model)
+    gaps, summary = crosscheck(checklist, model)
 
     # CLASSIFY (model-level): identify the formulation family against the registry — registry-matched,
     # evidence-anchored, candidate-HITL for new families. The classified result wraps back to the figure.

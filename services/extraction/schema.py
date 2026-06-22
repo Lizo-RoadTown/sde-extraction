@@ -149,6 +149,10 @@ class FigureRead(BaseModel):
     outcome: str
     pathogen: str
     panels: list[str]   # the variable plotted in each panel, in order: ["x(t)","I(t)","y(t)","v(t)","w(t)"]
+    # The FULL coupled state of the SDE behind the figure — a SUPERSET of panels. A figure may plot
+    # only I_h while its equation also needs the (unplotted) coupled variables (S_h, I_v, …). Capturing
+    # the whole state is what makes the assembled model CLOSED and runnable; panels stays "what's plotted".
+    state_variables: list[str] = []
     time_span: "TimeSpan"
 
 

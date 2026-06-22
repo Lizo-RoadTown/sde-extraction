@@ -24,17 +24,21 @@ from transform import ExecutableModel, safe_code_check, sha256_text
 
 READ_FIGURE_SYSTEM = """You read ONE figure from a stochastic-differential-equation (SDE) epidemiological paper.
 
-Return the figure's identity and — most important — the CHECKLIST of state variables it plots: one entry
-in `panels` per variable shown, in order (e.g. ["S(t)","I(t)","R(t)"]). This checklist drives a separate
-extractor per variable downstream, so list exactly the state variables this figure plots — no more, no
-fewer. Rules: extract only what the figure/paper shows or states; if the time span is not stated, mark it
+Return the figure's identity plus TWO variable lists:
+  - `panels`: the variables the figure PLOTS, one per subplot, in order (e.g. ["I_h(t)"]).
+  - `state_variables`: the FULL coupled state of the SDE behind this figure — EVERY state variable in
+    its equations, INCLUDING ones the figure does not plot. A figure may show only I_h while the model
+    also has S_h, R_h and the vector compartments S_v, I_v; list them ALL here. panels must be a subset
+    of state_variables. This full state is what makes the extracted model runnable, so do not omit
+    coupled variables just because they aren't plotted.
+Rules: extract only what the figure/paper shows or states; if the time span is not stated, mark it
 absent; invent nothing."""
 
 
 def _stub_figure_read(figure_label: str) -> FigureRead:
     return FigureRead(
         figure_label=figure_label or "(figure)", figure_type="", outcome="", pathogen="",
-        panels=[], time_span=TimeSpan(initial_time=absent_slot(), final_time=absent_slot()),
+        panels=[], state_variables=[], time_span=TimeSpan(initial_time=absent_slot(), final_time=absent_slot()),
     )
 
 
@@ -72,9 +76,10 @@ def read_figure(
             content.append({"type": "input_image",
                             "image_url": "data:image/png;base64," + base64.b64encode(iso["png"]).decode()})
         content.append({"type": "input_text", "text": (
-            f"The attached image is the target figure ({figure_label}). Read it into the schema: list each "
-            f"plotted state variable as a panels[] entry (the variable checklist), in order; plus figure_type, "
-            f"outcome, pathogen, and the time span if the paper states it."
+            f"The attached image is the target figure ({figure_label}). Read it into the schema: list the "
+            f"PLOTTED variables in panels[] (in order), AND the FULL coupled state of the SDE behind it in "
+            f"state_variables[] (every variable in its equations, including unplotted coupled ones like the "
+            f"vector compartments); plus figure_type, outcome, pathogen, and the time span if stated."
         )})
         resp = client.responses.parse(
             model=MODEL,
